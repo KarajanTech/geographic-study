@@ -120,7 +120,7 @@ def _projected_geometries(
     for payload in geojson_geometries:
         try:
             geometry = shape(payload)
-        except Exception as error:  # noqa: BLE001 - shapely raises several types
+        except Exception as error:
             msg = "Exclusion zone is not a valid GeoJSON geometry"
             raise InvalidInputError(msg, details={"reason": str(error)}) from error
         if geometry.is_empty:
@@ -140,7 +140,8 @@ def _projected_points(
             msg = "Site coordinates must be [longitude, latitude] in EPSG:4326"
             raise InvalidInputError(msg, details={"lon": lon, "lat": lat})
         point = reproject_geometry(Point(lon, lat), WGS84, analysis_crs)
-        projected.append((float(point.x), float(point.y)))
+        x, y = point.coords[0]
+        projected.append((float(x), float(y)))
     return projected
 
 

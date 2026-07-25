@@ -4,6 +4,82 @@
  */
 
 export interface paths {
+    "/api/v1/analysis-runs/{candidates_run_id}/viewsheds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queue viewshed computation for a candidate run's sites
+         * @description Queue viewsheds for every accepted candidate of a run (or a subset).
+         *
+         *     Returns immediately with status ``pending`` or ``completed`` (if every
+         *     requested viewshed was already cached) — nothing is computed inside this
+         *     request. A worker process picks up pending work; see
+         *     ``app.workers.viewshed_worker``.
+         */
+        post: operations["enqueue_viewsheds_api_v1_analysis_runs__candidates_run_id__viewsheds_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analysis-runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get an analysis run */
+        get: operations["get_analysis_run_api_v1_analysis_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analysis-runs/{run_id}/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the candidate sites of a run */
+        get: operations["list_candidates_api_v1_analysis_runs__run_id__candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analysis-runs/{run_id}/viewsheds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the viewsheds of a batch run, with progress */
+        get: operations["list_viewsheds_api_v1_analysis_runs__run_id__viewsheds_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/datasets/{dataset_id}": {
         parameters: {
             query?: never;
@@ -166,6 +242,46 @@ export interface paths {
         patch: operations["update_project_api_v1_projects__project_id__patch"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/analysis-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List a project's analysis runs */
+        get: operations["list_analysis_runs_api_v1_projects__project_id__analysis_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate candidate Sentinel positions
+         * @description Grid the study area, filter by terrain, thin by separation, and persist.
+         *
+         *     Runs against the project's most recent processed DEM. Fails with a clear
+         *     message if no DEM has been ingested yet.
+         */
+        post: operations["generate_candidates_api_v1_projects__project_id__candidates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/datasets": {
         parameters: {
             query?: never;
@@ -189,10 +305,119 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/viewsheds/{viewshed_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a single viewshed */
+        get: operations["get_viewshed_api_v1_viewsheds__viewshed_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/viewsheds/{viewshed_id}/mask.tif": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download the viewshed mask GeoTIFF */
+        get: operations["download_viewshed_mask_api_v1_viewsheds__viewshed_id__mask_tif_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/viewsheds/{viewshed_id}/preview.png": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download a map-overlay preview of the viewshed */
+        get: operations["download_viewshed_preview_api_v1_viewsheds__viewshed_id__preview_png_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AnalysisRunKind
+         * @description What an analysis run produced. One kind per roadmap phase.
+         * @enum {string}
+         */
+        AnalysisRunKind: "candidates" | "viewshed";
+        /** AnalysisRunListResponse */
+        AnalysisRunListResponse: {
+            /** Items */
+            items: components["schemas"]["AnalysisRunResponse"][];
+            /** Total */
+            total: number;
+        };
+        /** AnalysisRunResponse */
+        AnalysisRunResponse: {
+            /** Algorithm Version */
+            algorithm_version: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Error */
+            error: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["AnalysisRunKind"];
+            /** Metrics */
+            metrics: {
+                [key: string]: unknown;
+            };
+            /** Parameters */
+            parameters: {
+                [key: string]: unknown;
+            };
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Random Seed */
+            random_seed: number | null;
+            /** Started At */
+            started_at: string | null;
+            status: components["schemas"]["AnalysisRunStatus"];
+            /** Surface Dataset Id */
+            surface_dataset_id: string | null;
+        };
+        /**
+         * AnalysisRunStatus
+         * @enum {string}
+         */
+        AnalysisRunStatus: "pending" | "running" | "completed" | "failed";
         /** Body_upload_dem_api_v1_projects__project_id__datasets_post */
         Body_upload_dem_api_v1_projects__project_id__datasets_post: {
             /**
@@ -249,6 +474,109 @@ export interface components {
             south: number;
             /** West */
             west: number;
+        };
+        /**
+         * CandidateGenerationRequest
+         * @description Parameters for one candidate generation run.
+         */
+        CandidateGenerationRequest: {
+            /**
+             * Blocked Sites
+             * @description Positions the operator has ruled out.
+             */
+            blocked_sites?: components["schemas"]["LonLat"][];
+            /**
+             * Exclusion Zones
+             * @description Zones in EPSG:4326 where no Sentinel may go.
+             */
+            exclusion_zones?: components["schemas"]["GeoJSONGeometry"][];
+            /**
+             * Jitter M
+             * @default 0
+             */
+            jitter_m: number;
+            /** Max Candidates */
+            max_candidates?: number | null;
+            /** Max Elevation M */
+            max_elevation_m?: number | null;
+            /**
+             * Max Slope Deg
+             * @default 25
+             */
+            max_slope_deg: number;
+            /** Min Elevation M */
+            min_elevation_m?: number | null;
+            /**
+             * Min Separation M
+             * @default 0
+             */
+            min_separation_m: number;
+            /**
+             * Prominence Radius M
+             * @default 1000
+             */
+            prominence_radius_m: number;
+            /**
+             * Required Sites
+             * @description Existing towers or mandatory positions; bypass terrain filters.
+             */
+            required_sites?: components["schemas"]["LonLat"][];
+            /**
+             * Seed
+             * @default 20240101
+             */
+            seed: number;
+            /**
+             * Spacing M
+             * @default 500
+             */
+            spacing_m: number;
+        };
+        /** CandidateListResponse */
+        CandidateListResponse: {
+            /** Items */
+            items: components["schemas"]["CandidateSiteResponse"][];
+            /** Total */
+            total: number;
+        };
+        /** CandidateSiteResponse */
+        CandidateSiteResponse: {
+            /** Elevation M */
+            elevation_m: number;
+            /** Filter Reasons */
+            filter_reasons: string[];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Allowed */
+            is_allowed: boolean;
+            /** Is Mandatory */
+            is_mandatory: boolean;
+            /** @description Point in EPSG:4326. */
+            location: components["schemas"]["GeoJSONPoint"];
+            /** Prominence M */
+            prominence_m: number;
+            /**
+             * Rank
+             * @description 0 is the highest ranked candidate.
+             */
+            rank: number;
+            /** Slope Deg */
+            slope_deg: number;
+            /** Source */
+            source: string;
+            /**
+             * X M
+             * @description Easting in the project's analysis CRS.
+             */
+            x_m: number;
+            /**
+             * Y M
+             * @description Northing in the project's analysis CRS.
+             */
+            y_m: number;
         };
         /**
          * ComponentStatus
@@ -388,6 +716,20 @@ export interface components {
              */
             type: "Polygon" | "MultiPolygon";
         };
+        /**
+         * GeoJSONPoint
+         * @description A GeoJSON Point in EPSG:4326: [longitude, latitude].
+         */
+        GeoJSONPoint: {
+            /** Coordinates */
+            coordinates: number[];
+            /**
+             * Type
+             * @default Point
+             * @constant
+             */
+            type: "Point";
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -423,6 +765,16 @@ export interface components {
              * @description Deployed API version.
              */
             version: string;
+        };
+        /**
+         * LonLat
+         * @description A single point in EPSG:4326, as [longitude, latitude].
+         */
+        LonLat: {
+            /** Lat */
+            lat: number;
+            /** Lon */
+            lon: number;
         };
         /**
          * ProjectCreateRequest
@@ -554,6 +906,118 @@ export interface components {
             /** Warnings */
             warnings: components["schemas"]["ValidationIssueResponse"][];
         };
+        /** ViewshedListResponse */
+        ViewshedListResponse: {
+            /** Items */
+            items: components["schemas"]["ViewshedResponse"][];
+            /** Total */
+            total: number;
+        };
+        /** ViewshedResponse */
+        ViewshedResponse: {
+            /** Algorithm Version */
+            algorithm_version: string;
+            bounds: components["schemas"]["BoundsMetric"] | null;
+            /** @description Extent in EPSG:4326, for map display. */
+            bounds_wgs84: components["schemas"]["BoundsWGS84"] | null;
+            /**
+             * Candidate Site Id
+             * Format: uuid
+             */
+            candidate_site_id: string;
+            /**
+             * Coverage Ratio
+             * @description visible_cell_count / total_cell_count, 0 to 1.
+             */
+            coverage_ratio?: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Error */
+            error: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Max Distance M */
+            max_distance_m: number;
+            /** Observer Elevation M */
+            observer_elevation_m: number | null;
+            /** Observer Height M */
+            observer_height_m: number;
+            /**
+             * Preview Url
+             * @description Relative URL of the overlay PNG.
+             */
+            preview_url?: string | null;
+            /** Refraction Coefficient */
+            refraction_coefficient: number;
+            /** Started At */
+            started_at: string | null;
+            status: components["schemas"]["ViewshedStatus"];
+            /**
+             * Surface Dataset Id
+             * Format: uuid
+             */
+            surface_dataset_id: string;
+            /** Target Height M */
+            target_height_m: number;
+            /** Total Cell Count */
+            total_cell_count: number | null;
+            /** Use Earth Curvature */
+            use_earth_curvature: boolean;
+            /** Visible Cell Count */
+            visible_cell_count: number | null;
+            /** Weighted Visible Score */
+            weighted_visible_score: number | null;
+        };
+        /**
+         * ViewshedRunRequest
+         * @description Parameters for a batch viewshed computation over a candidate run.
+         */
+        ViewshedRunRequest: {
+            /**
+             * Candidate Site Ids
+             * @description Compute only these candidates; defaults to every accepted site.
+             */
+            candidate_site_ids?: string[] | null;
+            /**
+             * Max Distance M
+             * @default 10000
+             */
+            max_distance_m: number;
+            /**
+             * Observer Height M
+             * @default 10
+             */
+            observer_height_m: number;
+            /**
+             * Refraction Coefficient
+             * @default 0.13
+             */
+            refraction_coefficient: number;
+            /**
+             * Target Height M
+             * @default 0
+             */
+            target_height_m: number;
+            /**
+             * Use Earth Curvature
+             * @default true
+             */
+            use_earth_curvature: boolean;
+        };
+        /**
+         * ViewshedStatus
+         * @description PostgreSQL doubles as the job queue: a worker polls rows at ``pending``.
+         * @enum {string}
+         */
+        ViewshedStatus: "pending" | "running" | "completed" | "failed";
     };
     responses: never;
     parameters: never;
@@ -563,6 +1027,137 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    enqueue_viewsheds_api_v1_analysis_runs__candidates_run_id__viewsheds_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidates_run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ViewshedRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisRunResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_analysis_run_api_v1_analysis_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisRunResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_candidates_api_v1_analysis_runs__run_id__candidates_get: {
+        parameters: {
+            query?: {
+                allowed_only?: boolean;
+                limit?: number | null;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_viewsheds_api_v1_analysis_runs__run_id__viewsheds_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ViewshedListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_dataset_api_v1_datasets__dataset_id__get: {
         parameters: {
             query?: never;
@@ -868,6 +1463,74 @@ export interface operations {
             };
         };
     };
+    list_analysis_runs_api_v1_projects__project_id__analysis_runs_get: {
+        parameters: {
+            query?: {
+                kind?: components["schemas"]["AnalysisRunKind"] | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisRunListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_candidates_api_v1_projects__project_id__candidates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateGenerationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisRunResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_datasets_api_v1_projects__project_id__datasets_get: {
         parameters: {
             query?: {
@@ -923,6 +1586,99 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DemIngestionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_viewshed_api_v1_viewsheds__viewshed_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                viewshed_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ViewshedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_viewshed_mask_api_v1_viewsheds__viewshed_id__mask_tif_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                viewshed_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/tiff": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_viewshed_preview_api_v1_viewsheds__viewshed_id__preview_png_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                viewshed_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": unknown;
                 };
             };
             /** @description Validation Error */

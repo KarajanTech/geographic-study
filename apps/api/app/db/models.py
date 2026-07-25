@@ -69,6 +69,16 @@ class AnalysisRunKind(StrEnum):
     """What an analysis run produced. One kind per roadmap phase."""
 
     CANDIDATES = "candidates"
+    VIEWSHED = "viewshed"
+
+
+class ViewshedStatus(StrEnum):
+    """PostgreSQL doubles as the job queue: a worker polls rows at ``pending``."""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 class AnalysisRunStatus(StrEnum):
@@ -286,4 +296,84 @@ class CandidateSite(Base):
         Index("ix_candidate_sites_run", "analysis_run_id"),
         Index("ix_candidate_sites_run_rank", "analysis_run_id", "rank"),
         Index("ix_candidate_sites_run_allowed", "analysis_run_id", "is_allowed"),
+    )
+
+
+class Viewshed(Base):
+    """A computed visibility mask, keyed so identical requests are cached.
+
+    ``cache_key`` (see ``app.geo.viewshed.compute_cache_key``) is unique: it
+    encodes the surface checksum, observer position and height, target height,
+    range and curvature settings. A repeat request with the same inputs finds
+    this row instead of recomputing — the cache called for in
+    ``ARCHITECTURE.md`` §7.
+
+    Rows are created at ``pending`` by the API request and picked up by the
+    worker; PostgreSQL is the job queue, so no separate broker is needed at
+    this scale.
+    """
+
+    __tablename__ = "viewsheds"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    candidate_site_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("candidate_sites.id", ondelete="CASCADE"), nullable=False
+    )
+    surface_dataset_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("datasets.id", ondelete="CASCADE"), nullable=False
+    )
+
+    cache_key: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    crs: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    status: Mapped[ViewshedStatus] = mapped_column(
+        Enum(ViewshedStatus, name="viewshed_status", values_callable=_enum_values),
+        nullable=False,
+        default=ViewshedStatus.PENDING,
+    )
+    algorithm_version: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    observer_height_m: Mapped[float] = mapped_column(Float, nullable=False)
+    target_height_m: Mapped[float] = mapped_column(Float, nullable=False)
+    max_distance_m: Mapped[float] = mapped_column(Float, nullable=False)
+    use_earth_curvature: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    refraction_coefficient: Mapped[float] = mapped_column(Float, nullable=False)
+
+    # Populated once computed. Paths are relative to the data directory, like
+    # every other stored file.
+    raster_uri: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    bitset_uri: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    preview_uri: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    bounds_left: Mapped[float | None] = mapped_column(Float, nullable=True)
+    bounds_bottom: Mapped[float | None] = mapped_column(Float, nullable=True)
+    bounds_right: Mapped[float | None] = mapped_column(Float, nullable=True)
+    bounds_top: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # The same extent reprojected to EPSG:4326, purely so the frontend can
+    # place the preview image on a map without reprojecting anything itself.
+    bounds_wgs84_west: Mapped[float | None] = mapped_column(Float, nullable=True)
+    bounds_wgs84_south: Mapped[float | None] = mapped_column(Float, nullable=True)
+    bounds_wgs84_east: Mapped[float | None] = mapped_column(Float, nullable=True)
+    bounds_wgs84_north: Mapped[float | None] = mapped_column(Float, nullable=True)
+    resolution_x: Mapped[float | None] = mapped_column(Float, nullable=True)
+    resolution_y: Mapped[float | None] = mapped_column(Float, nullable=True)
+    observer_elevation_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    visible_cell_count: Mapped[int | None] = mapped_column(nullable=True)
+    total_cell_count: Mapped[int | None] = mapped_column(nullable=True)
+    # Uniform-weight score for now (visible_cell_count x cell area); becomes a
+    # true risk-weighted score once Phase 6 introduces cell weights.
+    weighted_visible_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    candidate_site: Mapped[CandidateSite] = relationship()
+    surface_dataset: Mapped[Dataset] = relationship()
+
+    __table_args__ = (
+        Index("ix_viewsheds_candidate_site", "candidate_site_id"),
+        Index("ix_viewsheds_status", "status"),
     )

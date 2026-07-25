@@ -192,6 +192,17 @@ a:hover {
   stroke-width: 2;
 }
 
+.candidate-dot {
+  fill: #d29922;
+  stroke: #0e1116;
+  stroke-width: 0.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.candidate-dot-mandatory {
+  fill: #f85149;
+}
+
 /* --- Tables --- */
 
 .table-scroll {

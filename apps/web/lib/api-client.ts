@@ -6,13 +6,19 @@
  * never perform geospatial computation: they render what the API returns.
  */
 import type {
+  AnalysisRun,
+  AnalysisRunList,
   ApiErrorPayload,
+  CandidateGenerationRequest,
+  CandidateList,
   Dataset,
   DatasetList,
   HealthResponse,
   Project,
   ProjectList,
   ReadinessResponse,
+  ViewshedList,
+  ViewshedRunRequest,
 } from "@sentinel/shared-schemas";
 
 import { API_V1_PREFIX, browserApiBaseUrl, serverApiBaseUrl } from "./env";
@@ -61,7 +67,12 @@ function resolveBaseUrl(explicit?: string): string {
   return typeof window === "undefined" ? serverApiBaseUrl() : browserApiBaseUrl();
 }
 
-async function request<T>(path: string, options: ApiClientOptions = {}): Promise<T> {
+interface RequestOptions extends ApiClientOptions {
+  method?: "GET" | "POST";
+  jsonBody?: unknown;
+}
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const url = `${resolveBaseUrl(options.baseUrl)}${API_V1_PREFIX}${path}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => {
@@ -71,9 +82,14 @@ async function request<T>(path: string, options: ApiClientOptions = {}): Promise
   let response: Response;
   try {
     response = await fetch(url, {
-      headers: { Accept: "application/json" },
+      method: options.method ?? "GET",
+      headers:
+        options.jsonBody !== undefined
+          ? { Accept: "application/json", "Content-Type": "application/json" }
+          : { Accept: "application/json" },
+      body: options.jsonBody !== undefined ? JSON.stringify(options.jsonBody) : undefined,
       signal: controller.signal,
-      // Health data is live state, never a cached page artefact.
+      // Live state, never a cached page artefact.
       cache: "no-store",
     });
   } catch (cause) {
@@ -166,4 +182,69 @@ export function datasetPreviewUrl(
 /** Browser URL of a dataset's GeoTIFF. */
 export function datasetDownloadUrl(datasetId: string): string {
   return `${browserApiBaseUrl()}${API_V1_PREFIX}/datasets/${encodeURIComponent(datasetId)}/download.tif`;
+}
+
+/** `GET /api/v1/projects/{id}/analysis-runs`. */
+export function listAnalysisRuns(
+  projectId: string,
+  options?: ApiClientOptions,
+): Promise<AnalysisRunList> {
+  return request<AnalysisRunList>(
+    `/projects/${encodeURIComponent(projectId)}/analysis-runs`,
+    options,
+  );
+}
+
+/** `GET /api/v1/analysis-runs/{id}`. */
+export function getAnalysisRun(runId: string, options?: ApiClientOptions): Promise<AnalysisRun> {
+  return request<AnalysisRun>(`/analysis-runs/${encodeURIComponent(runId)}`, options);
+}
+
+/** `POST /api/v1/projects/{id}/candidates` — generate and persist candidate sites. */
+export function generateCandidates(
+  projectId: string,
+  payload: CandidateGenerationRequest,
+  options?: ApiClientOptions,
+): Promise<AnalysisRun> {
+  return request<AnalysisRun>(`/projects/${encodeURIComponent(projectId)}/candidates`, {
+    ...options,
+    method: "POST",
+    jsonBody: payload,
+  });
+}
+
+/** `GET /api/v1/analysis-runs/{id}/candidates`. */
+export function listCandidates(runId: string, options?: ApiClientOptions): Promise<CandidateList> {
+  return request<CandidateList>(`/analysis-runs/${encodeURIComponent(runId)}/candidates`, options);
+}
+
+/**
+ * `POST /api/v1/analysis-runs/{candidatesRunId}/viewsheds` — queue viewshed
+ * computation. Returns immediately; a worker computes the results.
+ */
+export function enqueueViewsheds(
+  candidatesRunId: string,
+  payload: ViewshedRunRequest,
+  options?: ApiClientOptions,
+): Promise<AnalysisRun> {
+  return request<AnalysisRun>(`/analysis-runs/${encodeURIComponent(candidatesRunId)}/viewsheds`, {
+    ...options,
+    method: "POST",
+    jsonBody: payload,
+  });
+}
+
+/** `GET /api/v1/analysis-runs/{id}/viewsheds` — a batch run's viewsheds and progress. */
+export function listViewsheds(runId: string, options?: ApiClientOptions): Promise<ViewshedList> {
+  return request<ViewshedList>(`/analysis-runs/${encodeURIComponent(runId)}/viewsheds`, options);
+}
+
+/** Browser URL of a viewshed's map-overlay preview PNG. */
+export function viewshedPreviewUrl(viewshedId: string): string {
+  return `${browserApiBaseUrl()}${API_V1_PREFIX}/viewsheds/${encodeURIComponent(viewshedId)}/preview.png`;
+}
+
+/** Browser URL of a viewshed's mask GeoTIFF. */
+export function viewshedMaskUrl(viewshedId: string): string {
+  return `${browserApiBaseUrl()}${API_V1_PREFIX}/viewsheds/${encodeURIComponent(viewshedId)}/mask.tif`;
 }

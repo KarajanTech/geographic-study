@@ -25,6 +25,15 @@ class GeoJSONGeometry(BaseModel):
         return {"type": self.type, "coordinates": self.coordinates}
 
 
+class GeoJSONPoint(BaseModel):
+    """A GeoJSON Point in EPSG:4326: [longitude, latitude]."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["Point"] = "Point"
+    coordinates: Annotated[list[float], Field(min_length=2, max_length=2)]
+
+
 class BoundsWGS84(BaseModel):
     """Axis-aligned extent in EPSG:4326, for placing an image on a map."""
 

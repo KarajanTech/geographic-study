@@ -8,9 +8,10 @@ COMPOSE := docker compose
 TEST_DATABASE_URL ?= $(shell grep -E '^SENTINEL_TEST_DATABASE_URL=' .env 2>/dev/null | cut -d= -f2-)
 
 .DEFAULT_GOAL := help
-.PHONY: help install dev up down logs ps dev-api dev-web \
+.PHONY: help install dev up down logs ps dev-api dev-web dev-worker \
         fmt fmt-check lint typecheck test test-cov check ci \
-        schemas schemas-check db-upgrade db-revision sample-dem clean
+        schemas schemas-check db-upgrade db-revision db-test-create \
+        sample-dem demo-project clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -44,6 +45,9 @@ dev-api: ## Run the API on the host with reload
 
 dev-web: ## Run the web app on the host
 	npm run dev --workspace @sentinel/web
+
+dev-worker: ## Run the viewshed worker on the host
+	cd $(API_DIR) && uv run python -m app.workers.viewshed_worker
 
 # --- Quality ------------------------------------------------------------------
 

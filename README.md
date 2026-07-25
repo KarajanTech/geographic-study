@@ -132,7 +132,7 @@ El detalle está en [`docs/development.md`](docs/development.md).
 
 ## Estado del proyecto
 
-**Fase actual: Phase 1 — ingesta geoespacial (completada).**
+**Fase actual: Phase 3 — motor de viewshed (completada).**
 
 - **Phase 0:** monorepo, API, PostGIS con migraciones, frontend tipado, contrato
   OpenAPI compartido, tests, lint, tipos y CI.
@@ -140,15 +140,27 @@ El detalle está en [`docs/development.md`](docs/development.md).
   automática de CRS métrico proyectado (ETRS89/UTM en Europa, WGS84/UTM fuera),
   carga de DEM GeoTIFF con validación, reproyección, recorte con buffer de
   alcance, hillshade, previsualización y visualización en el frontend.
+- **Phase 2:** malla regular de candidatos sobre el área de estudio, muestreo de
+  elevación, pendiente y prominencia local, filtrado por pendiente máxima,
+  banda de elevación y zonas de exclusión, separación mínima determinista,
+  posiciones obligatorias y bloqueadas, persistencia en `AnalysisRun` /
+  `CandidateSite` y visualización de los candidatos en el mapa del proyecto.
+- **Phase 3:** motor de viewshed (barrido radial de línea de vista en NumPy,
+  detrás de una interfaz `ViewshedEngine`), curvatura terrestre y refracción
+  configurables, caché determinista por clave de parámetros, cola de trabajos
+  sobre PostgreSQL procesada por un worker independiente (nunca dentro de la
+  petición HTTP), aislamiento de fallos por candidato, máscara en GeoTIFF y en
+  bits empaquetados, y visualización de la cobertura en el mapa del proyecto.
 
-Todavía no hay generación de candidatos, viewshed ni optimización: llegan en las
-fases 2 a 4 de [`ROADMAP.md`](ROADMAP.md).
+Todavía no hay optimización de cobertura: llega en la fase 4 de
+[`ROADMAP.md`](ROADMAP.md).
 
 Prueba rápida del pipeline completo:
 
 ```bash
 make up && make db-upgrade
-make demo-project        # crea un proyecto e ingiere un DEM sintético
+make dev-worker          # en otra terminal: procesa los viewsheds encolados
+make demo-project        # crea un proyecto, ingiere un DEM, genera candidatos y encola viewsheds
 ```
 
 Después, abrir <http://localhost:3000/projects>.

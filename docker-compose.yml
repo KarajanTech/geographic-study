@@ -39,6 +39,23 @@ services:
       db:
         condition: service_healthy
 
+  worker:
+    build:
+      context: ./apps/api
+      target: dev
+    command: ["python", "-m", "app.workers.viewshed_worker"]
+    environment:
+      SENTINEL_ENVIRONMENT: ${SENTINEL_ENVIRONMENT:-local}
+      SENTINEL_LOG_LEVEL: ${SENTINEL_LOG_LEVEL:-INFO}
+      SENTINEL_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sentinel}:${POSTGRES_PASSWORD:-sentinel}@db:5432/${POSTGRES_DB:-sentinel}
+      SENTINEL_DATA_DIR: /srv/data
+    volumes:
+      - ./apps/api:/srv/api
+      - ./data:/srv/data
+    depends_on:
+      db:
+        condition: service_healthy
+
   web:
     build:
       context: .

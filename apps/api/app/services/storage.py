@@ -94,6 +94,17 @@ def processed_dataset_dir(project_id: uuid.UUID, dataset_id: uuid.UUID, settings
     return resolve_within(settings.processed_dir, "projects", str(project_id), str(dataset_id))
 
 
+def viewshed_dir(project_id: uuid.UUID, viewshed_id: uuid.UUID, settings: Settings) -> Path:
+    """Directory holding one viewshed's raster and packed-bit mask.
+
+    Viewsheds are analysis outputs, not dataset transformations, so they live
+    under ``data/outputs`` rather than ``data/processed``.
+    """
+    return resolve_within(
+        settings.outputs_dir, "projects", str(project_id), "viewsheds", str(viewshed_id)
+    )
+
+
 def to_relative_uri(path: Path, settings: Settings) -> str:
     """Store paths relative to the data directory, never absolute.
 

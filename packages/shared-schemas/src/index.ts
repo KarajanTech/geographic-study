@@ -40,6 +40,29 @@ export type BoundsWGS84 = components["schemas"]["BoundsWGS84"];
 export type BoundsMetric = components["schemas"]["BoundsMetric"];
 /** A GeoJSON Polygon or MultiPolygon in EPSG:4326. */
 export type GeoJSONGeometry = components["schemas"]["GeoJSONGeometry"];
+/** A GeoJSON Point in EPSG:4326. */
+export type GeoJSONPoint = components["schemas"]["GeoJSONPoint"];
+
+/** One execution of a pipeline stage, with its parameters and metrics. */
+export type AnalysisRun = components["schemas"]["AnalysisRunResponse"];
+export type AnalysisRunList = components["schemas"]["AnalysisRunListResponse"];
+export type AnalysisRunKind = components["schemas"]["AnalysisRunKind"];
+export type AnalysisRunStatus = components["schemas"]["AnalysisRunStatus"];
+
+/** Parameters for a candidate generation run. */
+export type CandidateGenerationRequest = components["schemas"]["CandidateGenerationRequest"];
+
+/** One potential Sentinel location produced by a candidate run. */
+export type CandidateSite = components["schemas"]["CandidateSiteResponse"];
+export type CandidateList = components["schemas"]["CandidateListResponse"];
+
+/** Parameters for a batch viewshed computation over a candidate run. */
+export type ViewshedRunRequest = components["schemas"]["ViewshedRunRequest"];
+
+/** A computed visibility mask for one candidate site. */
+export type Viewshed = components["schemas"]["ViewshedResponse"];
+export type ViewshedList = components["schemas"]["ViewshedListResponse"];
+export type ViewshedStatus = components["schemas"]["ViewshedStatus"];
 
 /** Error document rendered by the API for every domain error. */
 export interface ApiErrorPayload {

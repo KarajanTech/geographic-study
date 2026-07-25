@@ -49,12 +49,15 @@ export default async function HomePage(): Promise<React.ReactElement> {
         <h2>Roadmap</h2>
         <ul className="roadmap">
           <li>Phase 0 — foundation: monorepo, API, database, CI.</li>
+          <li>Phase 1 — geospatial ingestion: DEM upload, validation, reprojection, clipping.</li>
           <li>
-            <strong>Phase 1 — geospatial ingestion:</strong> DEM upload, validation, reprojection,
-            clipping. Current phase.
+            Phase 2 — candidate generation: grid, slope and prominence filtering, minimum
+            separation.
           </li>
-          <li>Phase 2 — candidate generation.</li>
-          <li>Phase 3 — viewshed engine.</li>
+          <li>
+            <strong>Phase 3 — viewshed engine:</strong> line-of-sight computation, caching, worker
+            execution. Current phase.
+          </li>
           <li>Phase 4 — greedy maximum coverage optimizer.</li>
           <li>Phase 5 — usable MVP interface.</li>
         </ul>

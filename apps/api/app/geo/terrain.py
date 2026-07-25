@@ -104,8 +104,8 @@ def compute_local_prominence(
         raise InvalidInputError(msg, details={"radius_m": radius_m})
 
     surface = np.asarray(elevation, dtype=np.float64)
-    size_y = max(1, int(round(2.0 * radius_m / resolution_y_m)) | 1)
-    size_x = max(1, int(round(2.0 * radius_m / resolution_x_m)) | 1)
+    size_y = max(1, round(2.0 * radius_m / resolution_y_m) | 1)
+    size_x = max(1, round(2.0 * radius_m / resolution_x_m) | 1)
     # 'nearest' extends the edge value rather than treating outside as zero,
     # which would make every border cell look like a summit.
     local_mean = uniform_filter(surface, size=(size_y, size_x), mode="nearest")

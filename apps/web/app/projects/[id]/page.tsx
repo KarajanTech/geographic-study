@@ -1,18 +1,37 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import type { BoundsWGS84, Dataset, Project } from "@sentinel/shared-schemas";
+import type {
+  AnalysisRun,
+  BoundsWGS84,
+  CandidateSite,
+  Dataset,
+  Project,
+  Viewshed,
+} from "@sentinel/shared-schemas";
 
+import { CandidateTable } from "@/components/candidate-table";
 import { DatasetTable } from "@/components/dataset-table";
 import { StudyAreaMap } from "@/components/study-area-map";
+import { ViewshedTable } from "@/components/viewshed-table";
 import {
   ApiError,
   datasetDownloadUrl,
   datasetPreviewUrl,
   getProject,
+  listAnalysisRuns,
+  listCandidates,
   listProjectDatasets,
+  listViewsheds,
+  viewshedPreviewUrl,
 } from "@/lib/api-client";
-import { formatArea, formatCoordinate, formatDate, formatPercent } from "@/lib/format";
+import {
+  formatArea,
+  formatCoordinate,
+  formatDate,
+  formatNumber,
+  formatPercent,
+} from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -54,10 +73,12 @@ export default async function ProjectPage({ params }: PageProps): Promise<React.
 
   let project: Project;
   let datasets: Dataset[];
+  let analysisRuns: AnalysisRun[];
   try {
-    [project, datasets] = await Promise.all([
+    [project, datasets, analysisRuns] = await Promise.all([
       getProject(id),
       listProjectDatasets(id).then((list) => list.items),
+      listAnalysisRuns(id).then((list) => list.items),
     ]);
   } catch (cause) {
     if (cause instanceof ApiError && cause.status === 404) {
@@ -70,6 +91,21 @@ export default async function ProjectPage({ params }: PageProps): Promise<React.
   const raw = datasets.find((dataset) => dataset.role === "raw");
   const previewBounds = previewBoundsOf(processed);
   const validRatio = validRatioOf(processed);
+
+  const latestCandidateRun = analysisRuns
+    .filter((run) => run.kind === "candidates" && run.status === "completed")
+    .at(0); // the API lists runs newest first
+  const candidates: CandidateSite[] = latestCandidateRun
+    ? (await listCandidates(latestCandidateRun.id)).items
+    : [];
+
+  const latestViewshedRun = analysisRuns.filter((run) => run.kind === "viewshed").at(0); // pending/running runs are shown too, so progress is visible
+  const viewsheds: Viewshed[] = latestViewshedRun
+    ? (await listViewsheds(latestViewshedRun.id)).items
+    : [];
+  const viewshedOverlays = viewsheds
+    .filter((v) => v.status === "completed" && v.preview_url && v.bounds_wgs84)
+    .map((v) => ({ id: v.id, url: viewshedPreviewUrl(v.id), bounds: v.bounds_wgs84! }));
 
   return (
     <main>
@@ -87,6 +123,8 @@ export default async function ProjectPage({ params }: PageProps): Promise<React.
           area={project.area}
           previewUrl={processed ? datasetPreviewUrl(processed.id) : null}
           previewBounds={previewBounds}
+          candidates={candidates}
+          viewshedOverlays={viewshedOverlays}
         />
       </section>
 
@@ -149,6 +187,79 @@ export default async function ProjectPage({ params }: PageProps): Promise<React.
           </ol>
         </section>
       ) : null}
+
+      <section className="panel">
+        <h2>Candidate sites</h2>
+        {latestCandidateRun ? (
+          <>
+            <dl>
+              <dt>Grid points evaluated</dt>
+              <dd>
+                {formatNumber(Number(latestCandidateRun.metrics["grid_point_count"] ?? 0), 0)}
+              </dd>
+              <dt>Accepted candidates</dt>
+              <dd>{candidates.length}</dd>
+              <dt>Spacing</dt>
+              <dd>{formatNumber(Number(latestCandidateRun.parameters["spacing_m"] ?? 0), 0)} m</dd>
+              <dt>Max slope</dt>
+              <dd>
+                {formatNumber(Number(latestCandidateRun.parameters["max_slope_deg"] ?? 0), 1)}°
+              </dd>
+              <dt>Generated</dt>
+              <dd>{formatDate(latestCandidateRun.created_at)}</dd>
+            </dl>
+            <CandidateTable candidates={candidates} />
+          </>
+        ) : (
+          <p className="subtitle">
+            No candidates generated yet. Run{" "}
+            <code>POST /api/v1/projects/{project.id}/candidates</code> against a project with a
+            processed DEM.
+          </p>
+        )}
+      </section>
+
+      <section className="panel">
+        <h2>Viewsheds</h2>
+        {latestViewshedRun ? (
+          <>
+            <dl>
+              <dt>Status</dt>
+              <dd>
+                <span
+                  className={`status status-${latestViewshedRun.status === "completed" ? "up" : latestViewshedRun.status === "failed" ? "down" : "not_configured"}`}
+                >
+                  {latestViewshedRun.status}
+                </span>
+              </dd>
+              <dt>Progress</dt>
+              <dd>
+                {formatNumber(Number(latestViewshedRun.metrics["completed"] ?? 0), 0)} completed,{" "}
+                {formatNumber(Number(latestViewshedRun.metrics["failed"] ?? 0), 0)} failed,{" "}
+                {formatNumber(Number(latestViewshedRun.metrics["pending"] ?? 0), 0)} pending
+              </dd>
+              <dt>Cache hits</dt>
+              <dd>{formatNumber(Number(latestViewshedRun.metrics["cache_hits"] ?? 0), 0)}</dd>
+              <dt>Range</dt>
+              <dd>
+                {formatNumber(Number(latestViewshedRun.parameters["max_distance_m"] ?? 0), 0)} m
+              </dd>
+              <dt>Requested</dt>
+              <dd>{formatDate(latestViewshedRun.created_at)}</dd>
+            </dl>
+            <ViewshedTable viewsheds={viewsheds} />
+          </>
+        ) : (
+          <p className="subtitle">
+            No viewsheds generated yet. Run{" "}
+            <code>
+              POST /api/v1/analysis-runs/{latestCandidateRun?.id ?? "&lt;candidates-run-id&gt;"}
+              /viewsheds
+            </code>{" "}
+            against a project with candidate sites, then let the worker process it.
+          </p>
+        )}
+      </section>
 
       <section className="panel">
         <h2>Datasets</h2>

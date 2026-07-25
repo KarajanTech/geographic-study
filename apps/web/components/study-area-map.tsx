@@ -1,20 +1,28 @@
-import type { BoundsWGS84, GeoJSONGeometry } from "@sentinel/shared-schemas";
+import type { BoundsWGS84, CandidateSite, GeoJSONGeometry } from "@sentinel/shared-schemas";
 
 /**
- * Schematic viewer for a study area and its terrain preview.
+ * Schematic viewer for a study area, its terrain preview and candidate sites.
  *
- * Both inputs are already in EPSG:4326 and both were computed by the backend.
- * This component only plots them: it applies a cos(latitude) correction so the
+ * Every input is already in EPSG:4326 and was computed by the backend. This
+ * component only plots them: it applies a cos(latitude) correction so the
  * shape is not stretched, and nothing else. It is a picture, not a measurement
  * — every figure on the page comes from the API.
  *
  * The interactive basemap arrives with the Phase 5 interface.
  */
 
+interface ViewshedOverlay {
+  id: string;
+  url: string;
+  bounds: BoundsWGS84;
+}
+
 interface StudyAreaMapProps {
   area: GeoJSONGeometry;
   previewUrl?: string | null;
   previewBounds?: BoundsWGS84 | null;
+  candidates?: CandidateSite[];
+  viewshedOverlays?: ViewshedOverlay[];
   height?: number;
 }
 
@@ -65,6 +73,8 @@ export function StudyAreaMap({
   area,
   previewUrl,
   previewBounds,
+  candidates = [],
+  viewshedOverlays = [],
   height = 420,
 }: StudyAreaMapProps): React.ReactElement {
   const rings = ringsOf(area);
@@ -95,6 +105,9 @@ export function StudyAreaMap({
       })
       .join(" ") + " Z";
 
+  // Scaled to the geography so a dot stays a sensible size at any zoom level.
+  const dotRadius = (extent.east - extent.west) * xScale * 0.006;
+
   return (
     <figure className="map" style={{ height }}>
       <svg viewBox={viewBox} preserveAspectRatio="xMidYMid meet" role="img" aria-label="Study area">
@@ -109,6 +122,17 @@ export function StudyAreaMap({
             opacity={0.95}
           />
         ) : null}
+        {viewshedOverlays.map((overlay) => (
+          <image
+            key={overlay.id}
+            href={overlay.url}
+            x={overlay.bounds.west * xScale}
+            y={-overlay.bounds.north}
+            width={(overlay.bounds.east - overlay.bounds.west) * xScale}
+            height={overlay.bounds.north - overlay.bounds.south}
+            preserveAspectRatio="none"
+          />
+        ))}
         {rings.map((ring, index) => (
           <path
             key={index}
@@ -117,9 +141,26 @@ export function StudyAreaMap({
             vectorEffect="non-scaling-stroke"
           />
         ))}
+        {candidates.map((candidate) => {
+          const [lon, lat] = candidate.location.coordinates;
+          if (lon === undefined || lat === undefined) return null;
+          return (
+            <circle
+              key={candidate.id}
+              cx={lon * xScale}
+              cy={-lat}
+              r={dotRadius}
+              className={
+                candidate.is_mandatory ? "candidate-dot candidate-dot-mandatory" : "candidate-dot"
+              }
+            />
+          );
+        })}
       </svg>
       <figcaption>
-        Study area outline over the hillshaded surface. Schematic projection, EPSG:4326.
+        Study area outline over the hillshaded surface
+        {candidates.length > 0 ? `, with ${candidates.length} candidate sites` : ""}. Schematic
+        projection, EPSG:4326.
       </figcaption>
     </figure>
   );

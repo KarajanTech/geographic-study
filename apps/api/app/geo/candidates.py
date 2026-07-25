@@ -19,7 +19,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import numpy as np
 import rasterio
@@ -28,7 +28,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
 from shapely.prepared import prep
-from typing import Annotated
 
 from app.core.errors import InvalidInputError
 from app.core.logging import get_logger
@@ -63,9 +62,9 @@ class CandidateParameters(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    spacing_m: Annotated[
-        float, Field(gt=0, le=20_000, description="Grid spacing in metres.")
-    ] = 500.0
+    spacing_m: Annotated[float, Field(gt=0, le=20_000, description="Grid spacing in metres.")] = (
+        500.0
+    )
     max_slope_deg: Annotated[
         float, Field(ge=0, le=90, description="Reject terrain steeper than this.")
     ] = 25.0
@@ -205,12 +204,9 @@ def build_grid(
     total = xs.size * ys.size
     if total > MAX_GRID_POINTS:
         msg = (
-            f"Grid of {total:,} points is too large; increase spacing_m "
-            f"(limit {MAX_GRID_POINTS:,})"
+            f"Grid of {total:,} points is too large; increase spacing_m (limit {MAX_GRID_POINTS:,})"
         )
-        raise InvalidInputError(
-            msg, details={"grid_points": int(total), "spacing_m": spacing_m}
-        )
+        raise InvalidInputError(msg, details={"grid_points": int(total), "spacing_m": spacing_m})
 
     grid_x, grid_y = np.meshgrid(xs, ys, indexing="xy")
     flat_x = grid_x.ravel()
@@ -391,9 +387,7 @@ def generate_candidates(
             rejections[RejectionReason.EXCLUDED_ZONE] += 1
             continue
 
-        if any(
-            (x - bx) ** 2 + (y - by) ** 2 <= blocked_radius**2 for bx, by in blocked_points
-        ):
+        if any((x - bx) ** 2 + (y - by) ** 2 <= blocked_radius**2 for bx, by in blocked_points):
             rejections[RejectionReason.BLOCKED_SITE] += 1
             blocked_records.append(RejectedCandidate(x, y, RejectionReason.BLOCKED_SITE))
             continue

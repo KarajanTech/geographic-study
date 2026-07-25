@@ -7,11 +7,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.db.models import Dataset, Project
+from geoalchemy2.shape import to_shape
+from shapely.geometry import mapping
+
+from app.db.models import AnalysisRun, CandidateSite, Dataset, Project, Viewshed
 from app.geo.validation import ValidationReport
+from app.schemas.candidate import AnalysisRunResponse, CandidateSiteResponse
 from app.schemas.dataset import DatasetResponse, ValidationIssueResponse, ValidationResponse
-from app.schemas.geojson import BoundsMetric, BoundsWGS84, GeoJSONGeometry
+from app.schemas.geojson import BoundsMetric, BoundsWGS84, GeoJSONGeometry, GeoJSONPoint
 from app.schemas.project import ProjectResponse
+from app.schemas.viewshed import ViewshedResponse
 from app.services.projects import project_area_geojson
 
 
@@ -91,4 +96,96 @@ def serialize_validation(report: ValidationReport) -> ValidationResponse:
         errors=[ValidationIssueResponse(code=e.code, message=e.message) for e in report.errors],
         warnings=[ValidationIssueResponse(code=w.code, message=w.message) for w in report.warnings],
         coverage_ratio=report.coverage_ratio,
+    )
+
+
+def serialize_analysis_run(run: AnalysisRun) -> AnalysisRunResponse:
+    return AnalysisRunResponse(
+        id=run.id,
+        project_id=run.project_id,
+        surface_dataset_id=run.surface_dataset_id,
+        kind=run.kind,
+        status=run.status,
+        algorithm_version=run.algorithm_version,
+        parameters=run.parameters,
+        random_seed=run.random_seed,
+        metrics=run.metrics,
+        error=run.error,
+        started_at=run.started_at,
+        finished_at=run.finished_at,
+        created_at=run.created_at,
+    )
+
+
+def _viewshed_bounds(viewshed: Viewshed) -> BoundsMetric | None:
+    if viewshed.bounds_left is None:
+        return None
+    return BoundsMetric(
+        left=viewshed.bounds_left,
+        bottom=viewshed.bounds_bottom or 0.0,
+        right=viewshed.bounds_right or 0.0,
+        top=viewshed.bounds_top or 0.0,
+        crs=viewshed.crs or "",
+        units="m",
+    )
+
+
+def _viewshed_bounds_wgs84(viewshed: Viewshed) -> BoundsWGS84 | None:
+    if viewshed.bounds_wgs84_west is None:
+        return None
+    return BoundsWGS84(
+        west=viewshed.bounds_wgs84_west,
+        south=viewshed.bounds_wgs84_south or 0.0,
+        east=viewshed.bounds_wgs84_east or 0.0,
+        north=viewshed.bounds_wgs84_north or 0.0,
+    )
+
+
+def serialize_viewshed(viewshed: Viewshed) -> ViewshedResponse:
+    coverage_ratio = None
+    if viewshed.visible_cell_count is not None and viewshed.total_cell_count:
+        coverage_ratio = viewshed.visible_cell_count / viewshed.total_cell_count
+    return ViewshedResponse(
+        id=viewshed.id,
+        candidate_site_id=viewshed.candidate_site_id,
+        surface_dataset_id=viewshed.surface_dataset_id,
+        status=viewshed.status,
+        algorithm_version=viewshed.algorithm_version,
+        observer_height_m=viewshed.observer_height_m,
+        target_height_m=viewshed.target_height_m,
+        max_distance_m=viewshed.max_distance_m,
+        use_earth_curvature=viewshed.use_earth_curvature,
+        refraction_coefficient=viewshed.refraction_coefficient,
+        bounds=_viewshed_bounds(viewshed),
+        bounds_wgs84=_viewshed_bounds_wgs84(viewshed),
+        preview_url=f"/api/v1/viewsheds/{viewshed.id}/preview.png"
+        if viewshed.preview_uri
+        else None,
+        observer_elevation_m=viewshed.observer_elevation_m,
+        visible_cell_count=viewshed.visible_cell_count,
+        total_cell_count=viewshed.total_cell_count,
+        coverage_ratio=coverage_ratio,
+        weighted_visible_score=viewshed.weighted_visible_score,
+        error=viewshed.error,
+        started_at=viewshed.started_at,
+        finished_at=viewshed.finished_at,
+        created_at=viewshed.created_at,
+    )
+
+
+def serialize_candidate(site: CandidateSite) -> CandidateSiteResponse:
+    location = dict(mapping(to_shape(site.geometry)))
+    return CandidateSiteResponse(
+        id=site.id,
+        location=GeoJSONPoint(coordinates=list(location["coordinates"])),
+        x_m=site.x_m,
+        y_m=site.y_m,
+        elevation_m=site.elevation_m,
+        slope_deg=site.slope_deg,
+        prominence_m=site.prominence_m,
+        rank=site.rank,
+        is_allowed=site.is_allowed,
+        is_mandatory=site.is_mandatory,
+        source=site.source,
+        filter_reasons=site.filter_reasons,
     )

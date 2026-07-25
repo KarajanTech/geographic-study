@@ -44,24 +44,26 @@ export SENTINEL_DATABASE_URL=postgresql+psycopg://sentinel:sentinel@localhost:54
 make db-upgrade
 make dev-api     # http://localhost:8000
 make dev-web     # http://localhost:3000
+make dev-worker  # processes queued viewsheds; without it they stay pending
 ```
 
 ## Everyday commands
 
-| Command               | What it does                                                  |
-| --------------------- | ------------------------------------------------------------- |
-| `make help`           | List every target.                                            |
-| `make fmt`            | Format Python (Ruff) and TypeScript (Prettier).               |
-| `make lint`           | Ruff and ESLint.                                              |
-| `make typecheck`      | mypy (strict) and `tsc --noEmit`.                             |
-| `make test`           | pytest.                                                       |
-| `make test-cov`       | pytest with coverage.                                         |
-| `make check`          | Everything CI runs, locally.                                  |
-| `make schemas`        | Re-export OpenAPI and regenerate the shared TypeScript types. |
-| `make sample-dem`     | Write a synthetic DEM to `data/raw`.                          |
-| `make demo-project`   | Create a project and ingest a synthetic DEM through the API.  |
-| `make db-upgrade`     | Apply Alembic migrations.                                     |
-| `make db-test-create` | Create the PostGIS database the test suite uses.              |
+| Command               | What it does                                                                       |
+| --------------------- | ---------------------------------------------------------------------------------- |
+| `make help`           | List every target.                                                                 |
+| `make fmt`            | Format Python (Ruff) and TypeScript (Prettier).                                    |
+| `make lint`           | Ruff and ESLint.                                                                   |
+| `make typecheck`      | mypy (strict) and `tsc --noEmit`.                                                  |
+| `make test`           | pytest.                                                                            |
+| `make test-cov`       | pytest with coverage.                                                              |
+| `make check`          | Everything CI runs, locally.                                                       |
+| `make schemas`        | Re-export OpenAPI and regenerate the shared TypeScript types.                      |
+| `make sample-dem`     | Write a synthetic DEM to `data/raw`.                                               |
+| `make demo-project`   | Create a project, ingest a synthetic DEM, generate candidates and queue viewsheds. |
+| `make dev-worker`     | Run the viewshed worker on the host.                                               |
+| `make db-upgrade`     | Apply Alembic migrations.                                                          |
+| `make db-test-create` | Create the PostGIS database the test suite uses.                                   |
 
 Install the git hooks once:
 
@@ -78,27 +80,31 @@ database answers, so `make test` always runs. To run them locally:
 ```bash
 make up               # PostGIS in Docker
 make db-test-create   # one-off: create sentinel_test with the extension
-make test             # 160 tests, database ones included
+make test             # all tests, database ones included
 ```
 
 The schema for those tests comes from `Base.metadata`; CI runs
 `alembic upgrade head` separately so the migrations themselves are also proven.
 
-## Ingesting a DEM
+## Ingesting a DEM, generating candidates and computing viewsheds
 
-Try the whole Phase 1 pipeline without a frontend form:
+Try the whole Phase 1 + 2 + 3 pipeline without a frontend form:
 
 ```bash
-make demo-project     # synthetic terrain, project created through the API
+make up && make dev-worker   # in one terminal: stack up, worker running
+make demo-project            # in another: project + DEM + candidates + queued viewsheds
 ```
 
-It prints the project id and preview URL. Open `/projects` in the web app to
-see the study area over its hillshaded surface.
+It prints the project id, preview URL and candidate/viewshed counts. Open
+`/projects` in the web app to see the study area, its hillshaded surface, the
+candidate sites, and — once the worker has processed the queue — each
+computed viewshed as a translucent overlay.
 
-With a real DEM:
+With a real DEM, and custom parameters:
 
 ```bash
-uv run --project apps/api python scripts/seed_demo_project.py --dem data/raw/mdt25.tif
+uv run --project apps/api python scripts/seed_demo_project.py \
+  --dem data/raw/mdt25.tif --spacing-m 250 --max-slope-deg 20
 ```
 
 Or over HTTP directly:
@@ -110,10 +116,30 @@ curl -X POST localhost:8000/api/v1/projects \
 
 curl -X POST localhost:8000/api/v1/projects/<id>/datasets \
   -F file=@data/raw/mdt25.tif -F buffer_m=15000
+
+curl -X POST localhost:8000/api/v1/projects/<id>/candidates \
+  -H 'content-type: application/json' \
+  -d '{"spacing_m": 250, "max_slope_deg": 20, "min_separation_m": 300}'
+
+# <candidates-run-id> comes from the response above.
+curl -X POST localhost:8000/api/v1/analysis-runs/<candidates-run-id>/viewsheds \
+  -H 'content-type: application/json' \
+  -d '{"observer_height_m": 10, "target_height_m": 0, "max_distance_m": 10000}'
 ```
 
-The response carries the raw dataset, the processed analysis surface, the
-validation report and the preview URL.
+DEM ingestion returns the raw dataset, the processed analysis surface, the
+validation report and the preview URL. Candidate generation returns the
+`AnalysisRun`, with `metrics.rejection_counts` explaining what was filtered out
+and why; fetch `GET /analysis-runs/{id}/candidates` for the accepted sites
+themselves.
+
+Viewshed enqueueing returns a `202` immediately with the batch `AnalysisRun` at
+`status=pending` (or `completed` if every candidate was already cached) —
+nothing is computed inside that request. A worker
+(`make dev-worker`, or the `worker` Compose service) polls PostgreSQL for
+pending work and processes it; poll `GET /analysis-runs/{id}` for progress and
+`GET /analysis-runs/{id}/viewsheds` for the results once it reaches
+`completed`.
 
 ## Configuration
 
@@ -132,16 +158,17 @@ apps/api                 FastAPI service
   app/api                HTTP routes (thin; no geospatial logic)
   app/core               config, logging, errors, paths, checksums
   app/db                 SQLAlchemy engine, session, base, entities
-  app/geo                CRS selection, raster metadata, validation, warp, terrain
+  app/geo                CRS selection, raster metadata, validation, warp, terrain, candidates, viewshed
   app/schemas            Pydantic request/response models
-  app/services           storage, projects, datasets, ingestion pipeline
+  app/services           storage, projects, datasets, ingestion, candidates, viewsheds
+  app/workers            standalone worker processes (viewshed_worker)
   migrations             Alembic
   tests                  pytest
 apps/web                 Next.js frontend
 packages/shared-schemas  OpenAPI document + generated TypeScript types
 data/raw                 immutable uploaded datasets
 data/processed           reprojected, clipped and derived rasters
-data/outputs             exports produced by an analysis run
+data/outputs             analysis outputs: viewshed masks, packed bitsets, previews
 docs/adr                 architecture decision records
 scripts                  operational scripts (sample DEM, DEM download, OpenAPI export)
 ```
