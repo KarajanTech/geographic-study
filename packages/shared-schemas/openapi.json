@@ -1,0 +1,1338 @@
+{
+  "components": {
+    "schemas": {
+      "Body_upload_dem_api_v1_projects__project_id__datasets_post": {
+        "properties": {
+          "buffer_m": {
+            "default": 15000.0,
+            "description": "Clip buffer in metres.",
+            "title": "Buffer M",
+            "type": "number"
+          },
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "description": "GeoTIFF elevation model.",
+            "title": "File",
+            "type": "string"
+          },
+          "target_resolution_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Resample to this cell size in metres.",
+            "title": "Target Resolution M"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_dem_api_v1_projects__project_id__datasets_post",
+        "type": "object"
+      },
+      "BoundsMetric": {
+        "additionalProperties": false,
+        "description": "Axis-aligned extent in the dataset's own projected CRS, in metres.",
+        "properties": {
+          "bottom": {
+            "title": "Bottom",
+            "type": "number"
+          },
+          "crs": {
+            "description": "CRS these coordinates belong to.",
+            "title": "Crs",
+            "type": "string"
+          },
+          "left": {
+            "title": "Left",
+            "type": "number"
+          },
+          "right": {
+            "title": "Right",
+            "type": "number"
+          },
+          "top": {
+            "title": "Top",
+            "type": "number"
+          },
+          "units": {
+            "description": "Unit of the values; 'm' for a metric CRS.",
+            "title": "Units",
+            "type": "string"
+          }
+        },
+        "required": [
+          "left",
+          "bottom",
+          "right",
+          "top",
+          "crs",
+          "units"
+        ],
+        "title": "BoundsMetric",
+        "type": "object"
+      },
+      "BoundsWGS84": {
+        "additionalProperties": false,
+        "description": "Axis-aligned extent in EPSG:4326, for placing an image on a map.",
+        "properties": {
+          "east": {
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "East",
+            "type": "number"
+          },
+          "north": {
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "North",
+            "type": "number"
+          },
+          "south": {
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "South",
+            "type": "number"
+          },
+          "west": {
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "West",
+            "type": "number"
+          }
+        },
+        "required": [
+          "west",
+          "south",
+          "east",
+          "north"
+        ],
+        "title": "BoundsWGS84",
+        "type": "object"
+      },
+      "ComponentStatus": {
+        "enum": [
+          "up",
+          "down",
+          "not_configured"
+        ],
+        "title": "ComponentStatus",
+        "type": "string"
+      },
+      "DatasetListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DatasetResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "DatasetListResponse",
+        "type": "object"
+      },
+      "DatasetResponse": {
+        "additionalProperties": false,
+        "description": "A stored dataset with its full geospatial description.",
+        "properties": {
+          "bounds": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoundsMetric"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Extent in the dataset's own CRS."
+          },
+          "bounds_wgs84": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoundsWGS84"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Extent in EPSG:4326, for display."
+          },
+          "checksum_sha256": {
+            "title": "Checksum Sha256",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "crs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crs"
+          },
+          "dataset_type": {
+            "$ref": "#/components/schemas/DatasetType"
+          },
+          "derived_from_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Derived From Id"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "description": "Driver, size, validation and derived files.",
+            "title": "Metadata",
+            "type": "object"
+          },
+          "nodata": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nodata"
+          },
+          "original_filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Filename"
+          },
+          "processing_history": {
+            "description": "Ordered record of every transformation applied.",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Processing History",
+            "type": "array"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "resolution_x": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cell size along X, in `units`.",
+            "title": "Resolution X"
+          },
+          "resolution_y": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cell size along Y, in `units`.",
+            "title": "Resolution Y"
+          },
+          "role": {
+            "$ref": "#/components/schemas/DatasetRole"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DatasetStatus"
+          },
+          "units": {
+            "description": "Horizontal unit of the CRS: 'm', 'degree' or 'unknown'.",
+            "title": "Units",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "derived_from_id",
+          "dataset_type",
+          "role",
+          "status",
+          "original_filename",
+          "checksum_sha256",
+          "size_bytes",
+          "crs",
+          "units",
+          "resolution_x",
+          "resolution_y",
+          "nodata",
+          "bounds",
+          "bounds_wgs84",
+          "metadata",
+          "processing_history",
+          "error",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "DatasetResponse",
+        "type": "object"
+      },
+      "DatasetRole": {
+        "description": "Raw uploads are immutable; everything else is derived from them.",
+        "enum": [
+          "raw",
+          "processed",
+          "derived"
+        ],
+        "title": "DatasetRole",
+        "type": "string"
+      },
+      "DatasetStatus": {
+        "enum": [
+          "pending",
+          "processing",
+          "ready",
+          "failed"
+        ],
+        "title": "DatasetStatus",
+        "type": "string"
+      },
+      "DatasetType": {
+        "description": "Dataset kinds from ARCHITECTURE.md section 4. Phase 1 ingests DEM only.",
+        "enum": [
+          "dem",
+          "dsm",
+          "vegetation",
+          "roads",
+          "exclusions",
+          "priorities",
+          "existing_sites"
+        ],
+        "title": "DatasetType",
+        "type": "string"
+      },
+      "DemIngestionResponse": {
+        "additionalProperties": false,
+        "description": "The raw upload and the analysis-ready surface derived from it.",
+        "properties": {
+          "preview_bounds_wgs84": {
+            "$ref": "#/components/schemas/BoundsWGS84",
+            "description": "Where to place the preview on a map."
+          },
+          "preview_url": {
+            "description": "Relative URL of the hillshade PNG preview.",
+            "title": "Preview Url",
+            "type": "string"
+          },
+          "processed": {
+            "$ref": "#/components/schemas/DatasetResponse"
+          },
+          "raw": {
+            "$ref": "#/components/schemas/DatasetResponse"
+          },
+          "validation": {
+            "$ref": "#/components/schemas/ValidationResponse"
+          }
+        },
+        "required": [
+          "raw",
+          "processed",
+          "validation",
+          "preview_url",
+          "preview_bounds_wgs84"
+        ],
+        "title": "DemIngestionResponse",
+        "type": "object"
+      },
+      "GeoJSONGeometry": {
+        "additionalProperties": false,
+        "description": "A GeoJSON Polygon or MultiPolygon in EPSG:4326.",
+        "properties": {
+          "coordinates": {
+            "description": "Longitude/latitude ring coordinates.",
+            "items": {},
+            "title": "Coordinates",
+            "type": "array"
+          },
+          "type": {
+            "description": "Polygon or MultiPolygon.",
+            "enum": [
+              "Polygon",
+              "MultiPolygon"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "coordinates"
+        ],
+        "title": "GeoJSONGeometry",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "additionalProperties": false,
+        "description": "Liveness answer. Does not touch any external dependency.",
+        "properties": {
+          "algorithm_version": {
+            "description": "Version of the analysis pipeline stored with every run.",
+            "title": "Algorithm Version",
+            "type": "string"
+          },
+          "environment": {
+            "description": "local | ci | staging | production.",
+            "title": "Environment",
+            "type": "string"
+          },
+          "service": {
+            "description": "Service identifier.",
+            "title": "Service",
+            "type": "string"
+          },
+          "status": {
+            "description": "Always 'ok' when the process can serve requests.",
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "description": "Deployed API version.",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "version",
+          "environment",
+          "algorithm_version"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "ProjectCreateRequest": {
+        "additionalProperties": false,
+        "description": "Create a project from a study area drawn or uploaded as GeoJSON.",
+        "properties": {
+          "analysis_crs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pin the projected metric CRS used for every calculation. Derived from the study area centroid when omitted.",
+            "examples": [
+              "EPSG:25830"
+            ],
+            "title": "Analysis Crs"
+          },
+          "area": {
+            "$ref": "#/components/schemas/GeoJSONGeometry",
+            "description": "Study area in EPSG:4326."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "area"
+        ],
+        "title": "ProjectCreateRequest",
+        "type": "object"
+      },
+      "ProjectListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ProjectListResponse",
+        "type": "object"
+      },
+      "ProjectResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_crs": {
+            "description": "Projected metric CRS used for all calculations.",
+            "title": "Analysis Crs",
+            "type": "string"
+          },
+          "area": {
+            "$ref": "#/components/schemas/GeoJSONGeometry",
+            "description": "Study area in EPSG:4326."
+          },
+          "area_km2": {
+            "description": "Study area surface, measured in the analysis CRS.",
+            "title": "Area Km2",
+            "type": "number"
+          },
+          "centroid_lat": {
+            "title": "Centroid Lat",
+            "type": "number"
+          },
+          "centroid_lon": {
+            "title": "Centroid Lon",
+            "type": "number"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "dataset_count": {
+            "title": "Dataset Count",
+            "type": "integer"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "area",
+          "analysis_crs",
+          "area_km2",
+          "centroid_lon",
+          "centroid_lat",
+          "dataset_count",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ProjectResponse",
+        "type": "object"
+      },
+      "ProjectUpdateRequest": {
+        "additionalProperties": false,
+        "description": "Descriptive fields only.\n\nThe study area and analysis CRS are immutable once datasets exist against\nthem.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "ProjectUpdateRequest",
+        "type": "object"
+      },
+      "ReadinessResponse": {
+        "additionalProperties": false,
+        "description": "Readiness answer. Reports each external dependency separately.",
+        "properties": {
+          "data_dir": {
+            "$ref": "#/components/schemas/ComponentStatus",
+            "description": "Whether the data directory is writable."
+          },
+          "database": {
+            "$ref": "#/components/schemas/ComponentStatus",
+            "description": "PostGIS connectivity."
+          },
+          "status": {
+            "description": "'ready' when every required dependency is up.",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "database",
+          "data_dir"
+        ],
+        "title": "ReadinessResponse",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "ValidationIssueResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ValidationIssueResponse",
+        "type": "object"
+      },
+      "ValidationResponse": {
+        "additionalProperties": false,
+        "description": "Result of validating a dataset against its project's study area.",
+        "properties": {
+          "coverage_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Share of the study area covered by the dataset, 0 to 1.",
+            "title": "Coverage Ratio"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationIssueResponse"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationIssueResponse"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ok",
+          "errors",
+          "warnings"
+        ],
+        "title": "ValidationResponse",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "summary": "Geospatial planning of wildfire surveillance tower networks.",
+    "title": "Sentinel Planner API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/datasets/{dataset_id}": {
+      "get": {
+        "operationId": "get_dataset_api_v1_datasets__dataset_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dataset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Dataset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get a dataset",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/v1/datasets/{dataset_id}/download.tif": {
+      "get": {
+        "operationId": "download_dataset_api_v1_datasets__dataset_id__download_tif_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dataset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Dataset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/tiff": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download the dataset GeoTIFF",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/v1/datasets/{dataset_id}/validate": {
+      "post": {
+        "description": "Re-read the file from storage and re-run every validation rule.",
+        "operationId": "validate_dataset_api_v1_datasets__dataset_id__validate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dataset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Dataset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Re-validate a dataset against its study area",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/v1/datasets/{dataset_id}/{kind}.png": {
+      "get": {
+        "description": "Serve the greyscale PNG preview or its hillshade version.\n\nA preview is a display artefact; measurements come from the API, never from\nthe image.",
+        "operationId": "get_preview_api_v1_datasets__dataset_id___kind__png_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dataset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Dataset Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "preview",
+                "hillshade_preview"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/png": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download a dataset preview image",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "description": "Report that the process is alive. Never touches the database.",
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Liveness probe",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/health/ready": {
+      "get": {
+        "description": "Report dependency status. Returns 503 when a required dependency is down.",
+        "operationId": "readiness_api_v1_health_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Readiness probe",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/projects": {
+      "get": {
+        "operationId": "list_projects_api_v1_projects_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List projects",
+        "tags": [
+          "projects"
+        ]
+      },
+      "post": {
+        "description": "Validate the study area, choose the analysis CRS and store the project.",
+        "operationId": "create_project_api_v1_projects_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create a project from a study area",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}": {
+      "get": {
+        "operationId": "get_project_api_v1_projects__project_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get a project",
+        "tags": [
+          "projects"
+        ]
+      },
+      "patch": {
+        "description": "Update name and description.\n\nThe study area and analysis CRS cannot change: datasets have already been\nreprojected and clipped against them.",
+        "operationId": "update_project_api_v1_projects__project_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rename a project",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/datasets": {
+      "get": {
+        "operationId": "list_datasets_api_v1_projects__project_id__datasets_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/DatasetRole"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List the datasets of a project",
+        "tags": [
+          "datasets"
+        ]
+      },
+      "post": {
+        "description": "Ingest a DEM: validate, reproject, clip to the study area plus buffer, shade.\n\nThe uploaded file is stored untouched; every product is derived from it.",
+        "operationId": "upload_dem_api_v1_projects__project_id__datasets_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_dem_api_v1_projects__project_id__datasets_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemIngestionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload a DEM and build the analysis surface",
+        "tags": [
+          "datasets"
+        ]
+      }
+    }
+  }
+}

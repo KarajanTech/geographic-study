@@ -1,0 +1,71 @@
+[project]
+name = "sentinel-planner-api"
+version = "0.1.0"
+description = "Sentinel Planner geospatial API"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+    "sqlalchemy>=2.0.36",
+    "psycopg[binary]>=3.2.0",
+    "alembic>=1.14.0",
+    "structlog>=24.4.0",
+    "numpy>=2.1.0",
+    "rasterio>=1.4.0",
+    "geoalchemy2>=0.20.0",
+    "shapely>=2.1.2",
+    "pyproj>=3.7.2",
+    "python-multipart>=0.0.32",
+    "scipy>=1.18.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-cov>=6.0.0",
+    # starlette>=1.3 drives TestClient with httpx2; plain httpx is deprecated there.
+    "httpx2>=2.9.1",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+    "pre-commit>=4.6.1",
+    "types-shapely>=2.1.0.20260724",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+# Ruff is configured once for the whole monorepo in <repo root>/ruff.toml.
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
+files = ["app", "tests", "migrations"]
+mypy_path = "."
+
+[[tool.mypy.overrides]]
+module = ["rasterio.*", "affine.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers --strict-config"
+filterwarnings = [
+    "error",
+    # rasterio's masked reads still set ndarray.shape directly, which NumPy 2.5
+    # deprecates. Third-party; revisit when rasterio ships a fix.
+    "ignore:Setting the shape on a NumPy array has been deprecated:DeprecationWarning",
+    # An ungeoreferenced upload is a case we test on purpose: it must be
+    # rejected by validation, not crash on GDAL's warning.
+    "ignore::rasterio.errors.NotGeoreferencedWarning",
+]
+
+[tool.coverage.run]
+source = ["app"]

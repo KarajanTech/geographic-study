@@ -1,0 +1,38 @@
+# Single Ruff configuration for every Python file in the monorepo
+# (apps/api, scripts, migrations), so `ruff check .` from the root is authoritative.
+line-length = 100
+target-version = "py312"
+# Markdown is excluded on purpose: the specification documents contain
+# illustrative Python snippets that Ruff would otherwise rewrite.
+extend-exclude = [".venv", "node_modules", "data", "*.md"]
+
+[lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # bugbear
+    "UP",   # pyupgrade
+    "C4",   # comprehensions
+    "SIM",  # simplify
+    "PTH",  # pathlib instead of os.path
+    "ANN",  # type annotations required
+    "BLE",  # no blind except without justification
+    "RUF",
+]
+ignore = [
+    "ANN401",  # Any is allowed where a framework signature demands it
+]
+
+[lint.per-file-ignores]
+# Test helpers may omit return annotations; fixtures are typed where it matters.
+"apps/api/tests/*" = ["ANN201", "ANN001"]
+# Alembic generates these signatures.
+"apps/api/migrations/*" = ["ANN201"]
+
+[lint.isort]
+known-first-party = ["app"]
+
+[format]
+docstring-code-format = true

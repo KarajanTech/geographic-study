@@ -1,0 +1,40 @@
+default_install_hook_types: [pre-commit]
+default_stages: [pre-commit]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=2048"]
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      - id: end-of-file-fixer
+        exclude: ^packages/shared-schemas/src/generated/
+      - id: trailing-whitespace
+        exclude: ^packages/shared-schemas/src/generated/
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.0
+    hooks:
+      - id: ruff-check
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (apps/api)
+        entry: bash -c 'cd apps/api && uv run mypy'
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      - id: prettier
+        name: prettier
+        entry: npx prettier --write
+        language: system
+        types_or: [ts, tsx, javascript, jsx, json, css, markdown]
+        exclude: ^(packages/shared-schemas/(src/generated/|openapi\.json)|package-lock\.json)
