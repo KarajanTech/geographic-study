@@ -19,6 +19,9 @@ dependencies = [
 [project.scripts]
 sentinel-study = "sentinel_coverage.run_study:cli"
 
+[tool.vercel]
+entrypoint = "api.ping:app"
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
