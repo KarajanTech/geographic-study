@@ -13,8 +13,14 @@ import type {
   CandidateList,
   Dataset,
   DatasetList,
+  DemIngestion,
   HealthResponse,
+  OptimizationRunRequest,
+  OptimizationSolution,
+  OptimizationSolutionList,
+  PrioritiesIngestion,
   Project,
+  ProjectCreateRequest,
   ProjectList,
   ReadinessResponse,
   ViewshedList,
@@ -70,6 +76,8 @@ function resolveBaseUrl(explicit?: string): string {
 interface RequestOptions extends ApiClientOptions {
   method?: "GET" | "POST";
   jsonBody?: unknown;
+  /** Multipart body, e.g. a file upload. Mutually exclusive with `jsonBody`. */
+  formBody?: FormData;
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -83,11 +91,15 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   try {
     response = await fetch(url, {
       method: options.method ?? "GET",
+      // The browser sets its own multipart Content-Type (with boundary) when
+      // the body is a FormData instance — setting it manually breaks the upload.
       headers:
         options.jsonBody !== undefined
           ? { Accept: "application/json", "Content-Type": "application/json" }
           : { Accept: "application/json" },
-      body: options.jsonBody !== undefined ? JSON.stringify(options.jsonBody) : undefined,
+      body:
+        options.formBody ??
+        (options.jsonBody !== undefined ? JSON.stringify(options.jsonBody) : undefined),
       signal: controller.signal,
       // Live state, never a cached page artefact.
       cache: "no-store",
@@ -157,14 +169,68 @@ export function getProject(id: string, options?: ApiClientOptions): Promise<Proj
   return request<Project>(`/projects/${encodeURIComponent(id)}`, options);
 }
 
+/** `POST /api/v1/projects` — create a study area from a drawn or uploaded polygon. */
+export function createProject(
+  payload: ProjectCreateRequest,
+  options?: ApiClientOptions,
+): Promise<Project> {
+  return request<Project>("/projects", { ...options, method: "POST", jsonBody: payload });
+}
+
 /** `GET /api/v1/projects/{id}/datasets`. */
 export function listProjectDatasets(id: string, options?: ApiClientOptions): Promise<DatasetList> {
   return request<DatasetList>(`/projects/${encodeURIComponent(id)}/datasets`, options);
 }
 
+const UPLOAD_TIMEOUT_MS = 120_000;
+
+/**
+ * `POST /api/v1/projects/{id}/datasets` — ingest a DEM: validate, reproject to
+ * the project's analysis CRS, clip with a buffer, derive a hillshade preview.
+ */
+export function uploadDataset(
+  projectId: string,
+  file: File,
+  bufferM: number,
+  targetResolutionM: number | null = null,
+  options?: ApiClientOptions,
+): Promise<DemIngestion> {
+  const formBody = new FormData();
+  formBody.set("file", file);
+  formBody.set("buffer_m", String(bufferM));
+  if (targetResolutionM !== null) {
+    formBody.set("target_resolution_m", String(targetResolutionM));
+  }
+  return request<DemIngestion>(`/projects/${encodeURIComponent(projectId)}/datasets`, {
+    ...options,
+    method: "POST",
+    formBody,
+    timeoutMs: options?.timeoutMs ?? UPLOAD_TIMEOUT_MS,
+  });
+}
+
 /** `GET /api/v1/datasets/{id}`. */
 export function getDataset(id: string, options?: ApiClientOptions): Promise<Dataset> {
   return request<Dataset>(`/datasets/${encodeURIComponent(id)}`, options);
+}
+
+/**
+ * `POST /api/v1/projects/{id}/priorities` — ingest a risk/priority raster,
+ * resampled onto the project's analysis DEM's exact grid.
+ */
+export function uploadPriorities(
+  projectId: string,
+  file: File,
+  options?: ApiClientOptions,
+): Promise<PrioritiesIngestion> {
+  const formBody = new FormData();
+  formBody.set("file", file);
+  return request<PrioritiesIngestion>(`/projects/${encodeURIComponent(projectId)}/priorities`, {
+    ...options,
+    method: "POST",
+    formBody,
+    timeoutMs: options?.timeoutMs ?? UPLOAD_TIMEOUT_MS,
+  });
 }
 
 /**
@@ -247,4 +313,52 @@ export function viewshedPreviewUrl(viewshedId: string): string {
 /** Browser URL of a viewshed's mask GeoTIFF. */
 export function viewshedMaskUrl(viewshedId: string): string {
   return `${browserApiBaseUrl()}${API_V1_PREFIX}/viewsheds/${encodeURIComponent(viewshedId)}/mask.tif`;
+}
+
+/**
+ * `POST /api/v1/analysis-runs/{viewshedRunId}/optimize` — greedily select
+ * candidates that maximize covered surface. Runs synchronously; returns the
+ * finished solution.
+ */
+export function optimizeCoverage(
+  viewshedRunId: string,
+  payload: OptimizationRunRequest,
+  options?: ApiClientOptions,
+): Promise<OptimizationSolution> {
+  return request<OptimizationSolution>(
+    `/analysis-runs/${encodeURIComponent(viewshedRunId)}/optimize`,
+    { ...options, method: "POST", jsonBody: payload },
+  );
+}
+
+/** `GET /api/v1/analysis-runs/{id}/optimization-solutions`. */
+export function listOptimizationSolutions(
+  runId: string,
+  options?: ApiClientOptions,
+): Promise<OptimizationSolutionList> {
+  return request<OptimizationSolutionList>(
+    `/analysis-runs/${encodeURIComponent(runId)}/optimization-solutions`,
+    options,
+  );
+}
+
+/** `GET /api/v1/optimization-solutions/{id}`. */
+export function getOptimizationSolution(
+  solutionId: string,
+  options?: ApiClientOptions,
+): Promise<OptimizationSolution> {
+  return request<OptimizationSolution>(
+    `/optimization-solutions/${encodeURIComponent(solutionId)}`,
+    options,
+  );
+}
+
+/** Browser URL to download the selected Sentinels as a GeoJSON FeatureCollection. */
+export function optimizationSolutionGeoJsonUrl(solutionId: string): string {
+  return `${browserApiBaseUrl()}${API_V1_PREFIX}/optimization-solutions/${encodeURIComponent(solutionId)}/export.geojson`;
+}
+
+/** Browser URL to download the selected Sentinels as CSV. */
+export function optimizationSolutionCsvUrl(solutionId: string): string {
+  return `${browserApiBaseUrl()}${API_V1_PREFIX}/optimization-solutions/${encodeURIComponent(solutionId)}/export.csv`;
 }

@@ -5,16 +5,25 @@ Kept out of the route handlers so the HTTP layer stays a thin adapter.
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from geoalchemy2.shape import to_shape
 from shapely.geometry import mapping
 
-from app.db.models import AnalysisRun, CandidateSite, Dataset, Project, Viewshed
+from app.db.models import (
+    AnalysisRun,
+    CandidateSite,
+    Dataset,
+    OptimizationSolution,
+    Project,
+    Viewshed,
+)
 from app.geo.validation import ValidationReport
 from app.schemas.candidate import AnalysisRunResponse, CandidateSiteResponse
 from app.schemas.dataset import DatasetResponse, ValidationIssueResponse, ValidationResponse
 from app.schemas.geojson import BoundsMetric, BoundsWGS84, GeoJSONGeometry, GeoJSONPoint
+from app.schemas.optimization import OptimizationIteration, OptimizationSolutionResponse
 from app.schemas.project import ProjectResponse
 from app.schemas.viewshed import ViewshedResponse
 from app.services.projects import project_area_geojson
@@ -188,4 +197,38 @@ def serialize_candidate(site: CandidateSite) -> CandidateSiteResponse:
         is_mandatory=site.is_mandatory,
         source=site.source,
         filter_reasons=site.filter_reasons,
+    )
+
+
+def serialize_optimization_solution(
+    solution: OptimizationSolution,
+) -> OptimizationSolutionResponse:
+    return OptimizationSolutionResponse(
+        id=solution.id,
+        analysis_run_id=solution.analysis_run_id,
+        solver=solution.solver,
+        algorithm_version=solution.algorithm_version,
+        stop_reason=solution.stop_reason,
+        selected_candidate_ids=[uuid.UUID(cid) for cid in solution.selected_candidate_ids],
+        coverage_ratio=solution.coverage_ratio,
+        weighted_coverage_ratio=solution.weighted_coverage_ratio,
+        weights_summary=solution.weights_summary,
+        visible_area_km2=solution.visible_area_km2,
+        hidden_area_km2=solution.hidden_area_km2,
+        objective_value=solution.objective_value,
+        total_cost=solution.total_cost,
+        redundancy_metrics=solution.redundancy_metrics,
+        iterations=[
+            OptimizationIteration(
+                step=entry["step"],
+                candidate_id=uuid.UUID(entry["candidate_id"]),
+                viewshed_id=uuid.UUID(entry["viewshed_id"]) if entry["viewshed_id"] else None,
+                marginal_gain=entry["marginal_gain"],
+                cumulative_coverage=entry["cumulative_coverage"],
+                cumulative_weighted_coverage=entry["cumulative_weighted_coverage"],
+            )
+            for entry in solution.iterations
+        ],
+        runtime_seconds=solution.runtime_seconds,
+        created_at=solution.created_at,
     )

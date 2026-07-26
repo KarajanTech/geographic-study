@@ -70,6 +70,7 @@ class AnalysisRunKind(StrEnum):
 
     CANDIDATES = "candidates"
     VIEWSHED = "viewshed"
+    OPTIMIZATION = "optimization"
 
 
 class ViewshedStatus(StrEnum):
@@ -302,11 +303,20 @@ class CandidateSite(Base):
 class Viewshed(Base):
     """A computed visibility mask, keyed so identical requests are cached.
 
-    ``cache_key`` (see ``app.geo.viewshed.compute_cache_key``) is unique: it
-    encodes the surface checksum, observer position and height, target height,
-    range and curvature settings. A repeat request with the same inputs finds
-    this row instead of recomputing — the cache called for in
-    ``ARCHITECTURE.md`` §7.
+    ``cache_key`` (see ``app.geo.viewshed.compute_cache_key``) encodes the
+    surface checksum, observer position and height, target height, range and
+    curvature settings. A repeat request with the same inputs finds a
+    completed row with that key and copies its result onto a new row instead
+    of recomputing — the cache called for in ``ARCHITECTURE.md`` §7.
+
+    ``cache_key`` is deliberately *not* unique: the exact same computation can
+    legitimately be requested by more than one candidate (a different
+    analysis run, or even a different project, whose candidate happens to
+    land on the same surface cell with the same parameters), and each of
+    those candidates still needs its own row so that ``candidate_site_id``
+    always identifies the right candidate for whichever run lists it — never
+    a candidate borrowed from the run that happened to compute it first (see
+    ADR 0006's addendum).
 
     Rows are created at ``pending`` by the API request and picked up by the
     worker; PostgreSQL is the job queue, so no separate broker is needed at
@@ -323,7 +333,7 @@ class Viewshed(Base):
         UUID(as_uuid=True), ForeignKey("datasets.id", ondelete="CASCADE"), nullable=False
     )
 
-    cache_key: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    cache_key: Mapped[str] = mapped_column(String(64), nullable=False)
     crs: Mapped[str | None] = mapped_column(String(64), nullable=True)
     status: Mapped[ViewshedStatus] = mapped_column(
         Enum(ViewshedStatus, name="viewshed_status", values_callable=_enum_values),
@@ -376,4 +386,62 @@ class Viewshed(Base):
     __table_args__ = (
         Index("ix_viewsheds_candidate_site", "candidate_site_id"),
         Index("ix_viewsheds_status", "status"),
+        Index("ix_viewsheds_cache_key", "cache_key"),
     )
+
+
+class OptimizationSolution(Base):
+    """The output of one optimization run, per ``ARCHITECTURE.md`` §4.
+
+    One ``AnalysisRun`` (kind=optimization) can hold more than one solution —
+    Phase 8 compares a greedy solution against an exact CP-SAT one for the
+    same candidates and viewsheds — so this is its own table rather than
+    columns bolted onto ``AnalysisRun``.
+    """
+
+    __tablename__ = "optimization_solutions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    analysis_run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("analysis_runs.id", ondelete="CASCADE"), nullable=False
+    )
+
+    solver: Mapped[str] = mapped_column(String(32), nullable=False, default="greedy")
+    algorithm_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    stop_reason: Mapped[str] = mapped_column(String(32), nullable=False)
+
+    # Ordered: index 0 is the first Sentinel the algorithm picked. Doubles as
+    # both "selected candidate indices" and "selected order" from
+    # AGENT_INSTRUCTIONS.md, since the list's order already carries both.
+    selected_candidate_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+
+    coverage_ratio: Mapped[float] = mapped_column(Float, nullable=False)
+    weighted_coverage_ratio: Mapped[float] = mapped_column(Float, nullable=False)
+    # What produced weighted_coverage_ratio's cell weights: uniform (Phase 4),
+    # a preset, an uploaded raster, and/or priority zone multipliers — the
+    # roadmap's "los pesos utilizados quedan guardados" (Phase 6).
+    weights_summary: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    visible_area_km2: Mapped[float] = mapped_column(Float, nullable=False)
+    hidden_area_km2: Mapped[float] = mapped_column(Float, nullable=False)
+
+    # Phase 4's objective is pure coverage maximization, so this equals
+    # weighted_coverage_ratio for now; Phase 6's multiobjective score (minus
+    # cost, minus blind spots, plus redundancy) replaces it later.
+    objective_value: Mapped[float] = mapped_column(Float, nullable=False)
+    total_cost: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Populated in Phase 8 once double/triple coverage is computed.
+    redundancy_metrics: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+
+    # One entry per selection: candidate_id, marginal_gain, cumulative
+    # coverage and weighted coverage — the unit-coverage curve and the
+    # ordered Sentinel table both read directly from this.
+    iterations: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+
+    runtime_seconds: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    analysis_run: Mapped[AnalysisRun] = relationship()
+
+    __table_args__ = (Index("ix_optimization_solutions_run", "analysis_run_id"),)

@@ -5,7 +5,8 @@
         "description": "What an analysis run produced. One kind per roadmap phase.",
         "enum": [
           "candidates",
-          "viewshed"
+          "viewshed",
+          "optimization"
         ],
         "title": "AnalysisRunKind",
         "type": "string"
@@ -188,6 +189,21 @@
           "file"
         ],
         "title": "Body_upload_dem_api_v1_projects__project_id__datasets_post",
+        "type": "object"
+      },
+      "Body_upload_priorities_api_v1_projects__project_id__priorities_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "description": "GeoTIFF risk/priority raster.",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_priorities_api_v1_projects__project_id__priorities_post",
         "type": "object"
       },
       "BoundsMetric": {
@@ -891,6 +907,335 @@
           "lat"
         ],
         "title": "LonLat",
+        "type": "object"
+      },
+      "OptimizationIteration": {
+        "additionalProperties": false,
+        "description": "One step of the greedy selection: which candidate, and what it gained.",
+        "properties": {
+          "candidate_id": {
+            "format": "uuid",
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "cumulative_coverage": {
+            "description": "Unweighted fraction of cells covered so far.",
+            "title": "Cumulative Coverage",
+            "type": "number"
+          },
+          "cumulative_weighted_coverage": {
+            "description": "Weighted fraction covered so far.",
+            "title": "Cumulative Weighted Coverage",
+            "type": "number"
+          },
+          "marginal_gain": {
+            "description": "Additional weighted surface this pick covers.",
+            "title": "Marginal Gain",
+            "type": "number"
+          },
+          "step": {
+            "description": "0 is the first Sentinel selected.",
+            "title": "Step",
+            "type": "integer"
+          },
+          "viewshed_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Viewshed Id"
+          }
+        },
+        "required": [
+          "step",
+          "candidate_id",
+          "viewshed_id",
+          "marginal_gain",
+          "cumulative_coverage",
+          "cumulative_weighted_coverage"
+        ],
+        "title": "OptimizationIteration",
+        "type": "object"
+      },
+      "OptimizationRunRequest": {
+        "additionalProperties": false,
+        "description": "Parameters for one greedy optimization run.",
+        "properties": {
+          "max_sites": {
+            "anyOf": [
+              {
+                "maximum": 10000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Stop once this many Sentinel are selected.",
+            "title": "Max Sites"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "enum": [
+                  "uniform",
+                  "ridge_priority",
+                  "valley_priority"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Built-in terrain-derived weight preset. Exclusive with `priorities_dataset_id`.",
+            "title": "Preset"
+          },
+          "priorities_dataset_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Use this project's priorities raster as the base cell weight, aligned to the analysis surface. Mutually exclusive with `preset`.",
+            "title": "Priorities Dataset Id"
+          },
+          "priority_zones": {
+            "description": "Zone weight multiplies the base weight, on top of any preset or raster.",
+            "items": {
+              "$ref": "#/components/schemas/PriorityZoneRequest"
+            },
+            "title": "Priority Zones",
+            "type": "array"
+          },
+          "target_coverage": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Stop once weighted coverage reaches this fraction.",
+            "title": "Target Coverage"
+          }
+        },
+        "title": "OptimizationRunRequest",
+        "type": "object"
+      },
+      "OptimizationSolutionListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OptimizationSolutionResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "OptimizationSolutionListResponse",
+        "type": "object"
+      },
+      "OptimizationSolutionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "algorithm_version": {
+            "title": "Algorithm Version",
+            "type": "string"
+          },
+          "analysis_run_id": {
+            "format": "uuid",
+            "title": "Analysis Run Id",
+            "type": "string"
+          },
+          "coverage_ratio": {
+            "title": "Coverage Ratio",
+            "type": "number"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "hidden_area_km2": {
+            "title": "Hidden Area Km2",
+            "type": "number"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "iterations": {
+            "items": {
+              "$ref": "#/components/schemas/OptimizationIteration"
+            },
+            "title": "Iterations",
+            "type": "array"
+          },
+          "objective_value": {
+            "title": "Objective Value",
+            "type": "number"
+          },
+          "redundancy_metrics": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redundancy Metrics"
+          },
+          "runtime_seconds": {
+            "title": "Runtime Seconds",
+            "type": "number"
+          },
+          "selected_candidate_ids": {
+            "description": "In selection order: index 0 was picked first.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Selected Candidate Ids",
+            "type": "array"
+          },
+          "solver": {
+            "title": "Solver",
+            "type": "string"
+          },
+          "stop_reason": {
+            "title": "Stop Reason",
+            "type": "string"
+          },
+          "total_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost"
+          },
+          "visible_area_km2": {
+            "title": "Visible Area Km2",
+            "type": "number"
+          },
+          "weighted_coverage_ratio": {
+            "title": "Weighted Coverage Ratio",
+            "type": "number"
+          },
+          "weights_summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What produced the cell weights: uniform, a preset, a raster, or priority zone.",
+            "title": "Weights Summary"
+          }
+        },
+        "required": [
+          "id",
+          "analysis_run_id",
+          "solver",
+          "algorithm_version",
+          "stop_reason",
+          "selected_candidate_ids",
+          "coverage_ratio",
+          "weighted_coverage_ratio",
+          "weights_summary",
+          "visible_area_km2",
+          "hidden_area_km2",
+          "objective_value",
+          "total_cost",
+          "redundancy_metrics",
+          "iterations",
+          "runtime_seconds",
+          "created_at"
+        ],
+        "title": "OptimizationSolutionResponse",
+        "type": "object"
+      },
+      "PrioritiesIngestionResponse": {
+        "additionalProperties": false,
+        "description": "The raw upload and the priorities raster aligned to the analysis DEM.",
+        "properties": {
+          "preview_bounds_wgs84": {
+            "$ref": "#/components/schemas/BoundsWGS84",
+            "description": "Where to place the preview on a map."
+          },
+          "preview_url": {
+            "description": "Relative URL of the greyscale PNG preview.",
+            "title": "Preview Url",
+            "type": "string"
+          },
+          "processed": {
+            "$ref": "#/components/schemas/DatasetResponse"
+          },
+          "raw": {
+            "$ref": "#/components/schemas/DatasetResponse"
+          }
+        },
+        "required": [
+          "raw",
+          "processed",
+          "preview_url",
+          "preview_bounds_wgs84"
+        ],
+        "title": "PrioritiesIngestionResponse",
+        "type": "object"
+      },
+      "PriorityZoneRequest": {
+        "additionalProperties": false,
+        "description": "A zone in EPSG:4326 whose cells get an extra weight multiplier.",
+        "properties": {
+          "geometry": {
+            "$ref": "#/components/schemas/GeoJSONGeometry"
+          },
+          "weight": {
+            "description": "Multiplier applied to this zone's cells, on top of the base weight.",
+            "exclusiveMinimum": 0.0,
+            "maximum": 100.0,
+            "title": "Weight",
+            "type": "number"
+          }
+        },
+        "required": [
+          "geometry",
+          "weight"
+        ],
+        "title": "PriorityZoneRequest",
         "type": "object"
       },
       "ProjectCreateRequest": {
@@ -1668,6 +2013,49 @@
         ]
       }
     },
+    "/api/v1/analysis-runs/{run_id}/optimization-solutions": {
+      "get": {
+        "operationId": "list_optimization_solutions_api_v1_analysis_runs__run_id__optimization_solutions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OptimizationSolutionListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List the optimization solutions of a run",
+        "tags": [
+          "analysis-runs"
+        ]
+      }
+    },
     "/api/v1/analysis-runs/{run_id}/viewsheds": {
       "get": {
         "operationId": "list_viewsheds_api_v1_analysis_runs__run_id__viewsheds_get",
@@ -1706,6 +2094,60 @@
           }
         },
         "summary": "List the viewsheds of a batch run, with progress",
+        "tags": [
+          "analysis-runs"
+        ]
+      }
+    },
+    "/api/v1/analysis-runs/{viewshed_run_id}/optimize": {
+      "post": {
+        "description": "Greedily choose candidates from a completed (or partial) viewshed run.\n\nRuns synchronously: this operates on masks Phase 3 already computed \u2014\narray operations, not ray casting \u2014 so it finishes in seconds even for\nhundreds of candidates.",
+        "operationId": "optimize_coverage_api_v1_analysis_runs__viewshed_run_id__optimize_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "viewshed_run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Viewshed Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptimizationRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OptimizationSolutionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Select the Sentinel positions that maximize covered surface",
         "tags": [
           "analysis-runs"
         ]
@@ -1941,6 +2383,133 @@
         "summary": "Readiness probe",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/v1/optimization-solutions/{solution_id}": {
+      "get": {
+        "operationId": "get_optimization_solution_api_v1_optimization_solutions__solution_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "solution_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Solution Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OptimizationSolutionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get a single optimization solution",
+        "tags": [
+          "analysis-runs"
+        ]
+      }
+    },
+    "/api/v1/optimization-solutions/{solution_id}/export.csv": {
+      "get": {
+        "operationId": "export_solution_csv_api_v1_optimization_solutions__solution_id__export_csv_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "solution_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Solution Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/csv": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export the selected Sentinel positions as CSV",
+        "tags": [
+          "analysis-runs"
+        ]
+      }
+    },
+    "/api/v1/optimization-solutions/{solution_id}/export.geojson": {
+      "get": {
+        "operationId": "export_solution_geojson_api_v1_optimization_solutions__solution_id__export_geojson_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "solution_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Solution Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/geo+json": {},
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export the selected Sentinel positions as GeoJSON",
+        "tags": [
+          "analysis-runs"
         ]
       }
     },
@@ -2354,6 +2923,60 @@
           }
         },
         "summary": "Upload a DEM and build the analysis surface",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/priorities": {
+      "post": {
+        "description": "Ingest a risk-weight raster, resampled onto the analysis DEM's exact grid.\n\nRequires a processed DEM to already exist for the project \u2014 there is\nnothing to align to otherwise. The raw upload is stored untouched, like\nevery other raw dataset.",
+        "operationId": "upload_priorities_api_v1_projects__project_id__priorities_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_priorities_api_v1_projects__project_id__priorities_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrioritiesIngestionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload a priorities/risk raster, aligned to the analysis DEM",
         "tags": [
           "datasets"
         ]

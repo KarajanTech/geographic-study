@@ -34,6 +34,9 @@ export type DatasetType = components["schemas"]["DatasetType"];
 export type DemIngestion = components["schemas"]["DemIngestionResponse"];
 export type ValidationResult = components["schemas"]["ValidationResponse"];
 
+/** The raw upload and the priorities raster aligned to the analysis DEM. */
+export type PrioritiesIngestion = components["schemas"]["PrioritiesIngestionResponse"];
+
 /** Extent in EPSG:4326, used to place a preview image on a map. */
 export type BoundsWGS84 = components["schemas"]["BoundsWGS84"];
 /** Extent in a projected CRS, with its units named. */
@@ -63,6 +66,16 @@ export type ViewshedRunRequest = components["schemas"]["ViewshedRunRequest"];
 export type Viewshed = components["schemas"]["ViewshedResponse"];
 export type ViewshedList = components["schemas"]["ViewshedListResponse"];
 export type ViewshedStatus = components["schemas"]["ViewshedStatus"];
+
+/** Parameters for a greedy coverage-maximization run. */
+export type OptimizationRunRequest = components["schemas"]["OptimizationRunRequest"];
+/** A zone whose cells get an extra weight multiplier. */
+export type PriorityZoneRequest = components["schemas"]["PriorityZoneRequest"];
+
+/** The Sentinel positions a greedy run selected, and how it got there. */
+export type OptimizationSolution = components["schemas"]["OptimizationSolutionResponse"];
+export type OptimizationSolutionList = components["schemas"]["OptimizationSolutionListResponse"];
+export type OptimizationIteration = components["schemas"]["OptimizationIteration"];
 
 /** Error document rendered by the API for every domain error. */
 export interface ApiErrorPayload {

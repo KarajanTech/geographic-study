@@ -93,8 +93,12 @@ def enqueue_viewshed_run(
     """Queue a viewshed computation for a candidate-generation run's sites.
 
     Creates the batch ``AnalysisRun`` (kind=viewshed, status=pending) and one
-    ``Viewshed`` row per candidate — reusing an existing row when its cache key
-    already exists — then returns immediately. Nothing is computed here.
+    ``Viewshed`` row per candidate. When a completed row with the same cache
+    key already exists, its result is copied onto a new row for this
+    candidate instead of recomputing — every row's ``candidate_site_id``
+    always identifies a candidate that belongs to *this* run, even if the
+    underlying computation was originally made for a different one. Returns
+    immediately; nothing is computed here.
     """
     candidates_run = get_analysis_run(session, candidates_run_id)
     if candidates_run.kind is not AnalysisRunKind.CANDIDATES:
@@ -151,10 +155,20 @@ def enqueue_viewshed_run(
             refraction_coefficient=refraction_coefficient,
             algorithm_version=_DEFAULT_ENGINE.algorithm_version,
         )
-        existing = session.scalar(select(Viewshed).where(Viewshed.cache_key == cache_key))
+        existing = session.scalar(
+            select(Viewshed).where(
+                Viewshed.cache_key == cache_key, Viewshed.status == ViewshedStatus.COMPLETED
+            )
+        )
         if existing is not None:
-            viewshed_ids.append(str(existing.id))
             cache_hits += 1
+            if existing.candidate_site_id == site.id:
+                viewshed_ids.append(str(existing.id))
+            else:
+                materialized = _materialize_cached_viewshed(site, existing)
+                session.add(materialized)
+                session.flush()
+                viewshed_ids.append(str(materialized.id))
             continue
 
         viewshed = Viewshed(
@@ -193,6 +207,49 @@ def enqueue_viewshed_run(
         cache_hits=cache_hits,
     )
     return viewshed_run
+
+
+def _materialize_cached_viewshed(site: CandidateSite, cached: Viewshed) -> Viewshed:
+    """Copy a completed viewshed's result onto a new row for another candidate.
+
+    The mask depends only on (surface, location, parameters) — the cache key
+    itself proves ``site`` sits at the same cell with the same settings — so
+    the underlying files are reused as-is. A new row is created rather than
+    pointing this run at ``cached`` directly, so ``candidate_site_id`` never
+    identifies a candidate from a different analysis run or project.
+    """
+    return Viewshed(
+        candidate_site_id=site.id,
+        surface_dataset_id=cached.surface_dataset_id,
+        cache_key=cached.cache_key,
+        status=ViewshedStatus.COMPLETED,
+        algorithm_version=cached.algorithm_version,
+        observer_height_m=cached.observer_height_m,
+        target_height_m=cached.target_height_m,
+        max_distance_m=cached.max_distance_m,
+        use_earth_curvature=cached.use_earth_curvature,
+        refraction_coefficient=cached.refraction_coefficient,
+        raster_uri=cached.raster_uri,
+        bitset_uri=cached.bitset_uri,
+        preview_uri=cached.preview_uri,
+        crs=cached.crs,
+        bounds_left=cached.bounds_left,
+        bounds_bottom=cached.bounds_bottom,
+        bounds_right=cached.bounds_right,
+        bounds_top=cached.bounds_top,
+        bounds_wgs84_west=cached.bounds_wgs84_west,
+        bounds_wgs84_south=cached.bounds_wgs84_south,
+        bounds_wgs84_east=cached.bounds_wgs84_east,
+        bounds_wgs84_north=cached.bounds_wgs84_north,
+        resolution_x=cached.resolution_x,
+        resolution_y=cached.resolution_y,
+        observer_elevation_m=cached.observer_elevation_m,
+        visible_cell_count=cached.visible_cell_count,
+        total_cell_count=cached.total_cell_count,
+        weighted_visible_score=cached.weighted_visible_score,
+        started_at=datetime.now(UTC),
+        finished_at=datetime.now(UTC),
+    )
 
 
 def _surface_checksum(session: Session, surface_dataset_id: uuid.UUID) -> str:

@@ -55,6 +55,16 @@ def list_datasets(
     return list(session.scalars(statement.order_by(Dataset.created_at)))
 
 
+def get_active_dem_dataset(session: Session, project_id: uuid.UUID) -> Dataset | None:
+    """The project's most recently ingested, ready analysis DEM, if any."""
+    candidates = [
+        dataset
+        for dataset in list_datasets(session, project_id, role=DatasetRole.PROCESSED)
+        if dataset.dataset_type is DatasetType.DEM and dataset.status is DatasetStatus.READY
+    ]
+    return candidates[-1] if candidates else None
+
+
 def _footprint_wgs84(metadata: RasterMetadata) -> Any | None:
     """Store the raster extent as a WGS84 polygon, for map display only."""
     if metadata.crs is None:
@@ -63,7 +73,7 @@ def _footprint_wgs84(metadata: RasterMetadata) -> Any | None:
     return from_shape(footprint, srid=STORAGE_SRID)
 
 
-def _apply_metadata(dataset: Dataset, metadata: RasterMetadata) -> None:
+def apply_raster_metadata(dataset: Dataset, metadata: RasterMetadata) -> None:
     dataset.crs = metadata.crs
     dataset.units = metadata.units
     dataset.resolution_x = metadata.resolution_x
@@ -163,7 +173,7 @@ def ingest_dem_upload(
         )
         raise
 
-    _apply_metadata(raw_dataset, result.source_metadata)
+    apply_raster_metadata(raw_dataset, result.source_metadata)
     raw_dataset.status = DatasetStatus.READY
     raw_dataset.metadata_json = {
         **metadata_to_storage_dict(result.source_metadata),
@@ -177,7 +187,7 @@ def ingest_dem_upload(
         },
     }
 
-    _apply_metadata(processed_dataset, result.analysis_metadata)
+    apply_raster_metadata(processed_dataset, result.analysis_metadata)
     processed_dataset.status = DatasetStatus.READY
     processed_dataset.source_uri = to_relative_uri(result.analysis_dem.path, settings)
     processed_dataset.metadata_json = {
@@ -208,7 +218,7 @@ def _apply_raw_metadata_best_effort(dataset: Dataset, path: Path) -> None:
         metadata = describe_raster(path)
     except InvalidInputError:
         return
-    _apply_metadata(dataset, metadata)
+    apply_raster_metadata(dataset, metadata)
     dataset.metadata_json = {**metadata_to_storage_dict(metadata), "source": "upload"}
 
 

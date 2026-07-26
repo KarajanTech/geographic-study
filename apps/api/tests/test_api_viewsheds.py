@@ -170,6 +170,66 @@ def test_different_parameters_do_not_share_the_cache(
     assert first["id"] != second["id"]
 
 
+def test_a_cache_hit_still_reports_this_runs_own_candidate(
+    api_client: TestClient, db_session: Session, settings: Settings, metric_dem: Path
+) -> None:
+    """A cache hit must never leak another run's candidate identity.
+
+    Regenerating candidates on the same project with the same DEM and spacing
+    places them on the same grid, so the second generation's candidates sit
+    at the exact same coordinates as the first's — and their viewsheds hit
+    the cache. Each viewshed row must still report *this* generation's own
+    candidate, not the one that happened to compute it first.
+    """
+    project, first_candidates = _project_with_candidates(api_client, metric_dem)
+    second_candidates = api_client.post(
+        f"{PROJECTS}/{project['id']}/candidates",
+        json={"spacing_m": 300.0, "max_slope_deg": 45.0},
+    ).json()
+
+    first_run = api_client.post(
+        f"{ANALYSIS_RUNS}/{first_candidates['id']}/viewsheds", json={"max_distance_m": 1000.0}
+    ).json()
+    process_pending_viewshed_runs(db_session, settings)
+    db_session.commit()
+
+    second_run = api_client.post(
+        f"{ANALYSIS_RUNS}/{second_candidates['id']}/viewsheds", json={"max_distance_m": 1000.0}
+    ).json()
+
+    assert second_run["metrics"]["cache_hits"] == second_run["metrics"]["total"]
+
+    first_candidate_ids = {
+        c["id"]
+        for c in api_client.get(f"{ANALYSIS_RUNS}/{first_candidates['id']}/candidates").json()[
+            "items"
+        ]
+    }
+    second_candidate_ids = {
+        c["id"]
+        for c in api_client.get(f"{ANALYSIS_RUNS}/{second_candidates['id']}/candidates").json()[
+            "items"
+        ]
+    }
+    assert first_candidate_ids.isdisjoint(second_candidate_ids)
+
+    second_viewsheds = api_client.get(f"{ANALYSIS_RUNS}/{second_run['id']}/viewsheds").json()[
+        "items"
+    ]
+    assert all(item["status"] == "completed" for item in second_viewsheds)
+    assert all(item["candidate_site_id"] in second_candidate_ids for item in second_viewsheds)
+    assert not any(item["candidate_site_id"] in first_candidate_ids for item in second_viewsheds)
+
+    # The underlying computation was reused, not repeated: no new rows besides
+    # the ones materialized for the second run's own candidates.
+    first_viewshed_ids = {
+        v["id"]
+        for v in api_client.get(f"{ANALYSIS_RUNS}/{first_run['id']}/viewsheds").json()["items"]
+    }
+    second_viewshed_ids = {v["id"] for v in second_viewsheds}
+    assert first_viewshed_ids.isdisjoint(second_viewshed_ids)
+
+
 def test_mask_and_preview_are_downloadable_after_processing(
     api_client: TestClient, db_session: Session, settings: Settings, metric_dem: Path
 ) -> None:

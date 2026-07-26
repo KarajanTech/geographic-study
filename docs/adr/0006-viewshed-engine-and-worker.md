@@ -119,3 +119,29 @@ endpoint never calls it, and the only production path is the worker's own loop.
   combine them with NumPy bitwise operations, without touching this module.
 - If GDAL's viewshed is ever wanted for comparison or higher fidelity, it is a
   second `ViewshedEngine` implementation and a config switch, not a rewrite.
+
+## Addendum (Phase 4): a cache hit materializes a new row, not a shared one
+
+Phase 4's live verification surfaced a real bug in the design above: reusing
+`existing.id` directly on a cache hit means `Viewshed.candidate_site_id` keeps
+pointing at whichever candidate _first_ triggered that computation, even when
+a _different_ candidate — from a later run, or even a different project —
+is the one now asking for it. This is reachable in ordinary use, not just a
+pathological edge case: two candidate-generation runs on the same DEM often
+place a candidate on the exact same grid cell, and the demo seed script's
+fixed-seed synthetic DEM makes it happen on every run. It broke Phase 4's own
+`OptimizationSolution.selected_candidate_ids` (recorded the wrong project's
+candidate) and, through it, the optimization table and the selected-candidate
+map overlay both silently failed their lookups.
+
+The fix: `enqueue_viewshed_run` now looks up a **completed** row by cache key
+(a still-pending or failed row is not a usable hit) and, if that row's
+`candidate_site_id` does not already match the current candidate, creates a
+new `Viewshed` row for the current candidate that copies every computed field
+(`raster_uri`, `bitset_uri`, `preview_uri`, bounds, resolution,
+`observer_elevation_m`, cell counts, `weighted_visible_score`) from the cached
+row. Nothing is recomputed and no file is duplicated — only a lightweight
+metadata row is added — but every row now correctly identifies the candidate
+it was returned for. `Viewshed.cache_key` is no longer a unique column
+(migration `0006_viewshed_cache_key_not_unique`) since multiple rows can
+legitimately share one now; it keeps a plain index for the lookup.

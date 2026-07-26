@@ -132,7 +132,7 @@ El detalle está en [`docs/development.md`](docs/development.md).
 
 ## Estado del proyecto
 
-**Fase actual: Phase 3 — motor de viewshed (completada).**
+**Fase actual: Phase 6 — cobertura ponderada por riesgo (completada).**
 
 - **Phase 0:** monorepo, API, PostGIS con migraciones, frontend tipado, contrato
   OpenAPI compartido, tests, lint, tipos y CI.
@@ -151,17 +151,45 @@ El detalle está en [`docs/development.md`](docs/development.md).
   sobre PostgreSQL procesada por un worker independiente (nunca dentro de la
   petición HTTP), aislamiento de fallos por candidato, máscara en GeoTIFF y en
   bits empaquetados, y visualización de la cobertura en el mapa del proyecto.
+- **Phase 4:** optimizador voraz de cobertura máxima (`solve_greedy`),
+  independiente de la API y la base de datos, construcción de la matriz
+  candidato-celda por encaje exacto de cada viewshed sobre la malla de la
+  superficie (sin remuestreo), ejecución síncrona (segundos, no una cola),
+  desempate determinista, parámetros de parada (`max_sites`,
+  `target_coverage`), persistencia en `OptimizationSolution` con la traza
+  completa de iteraciones, curva de unidades-cobertura y superposición de los
+  Sentinels seleccionados en el mapa del proyecto.
+- **Phase 5:** mapa interactivo real (Leaflet + OpenStreetMap) para dibujar el
+  área de estudio y visualizar resultados, formularios para cada paso (crear
+  proyecto, cargar DEM, generar candidatos, calcular viewsheds, optimizar),
+  seguimiento de progreso en vivo mientras el worker procesa la cola,
+  exportación de la solución en GeoJSON y CSV, y mensajes de error
+  comprensibles en cada formulario. Todo el flujo se completa desde el
+  navegador, sin terminal.
+- **Phase 6:** carga de un raster de riesgo/prioridad, alineado exactamente a
+  la malla del DEM de análisis (`resample_to_reference`, sin remuestreo
+  independiente); normalización min-max de los pesos; presets ilustrables
+  derivados del terreno (`ridge_priority`, `valley_priority`); zonas
+  prioritarias dibujables con un multiplicador de peso editable; cobertura
+  física y ponderada siempre reportadas por separado; los pesos usados en
+  cada solución quedan guardados (`weights_summary`) y se muestran en el
+  panel de optimización.
 
-Todavía no hay optimización de cobertura: llega en la fase 4 de
-[`ROADMAP.md`](ROADMAP.md).
+Todavía no hay optimización con restricción de presupuesto ni métricas de
+redundancia: llegan en las fases 7 y 8 de [`ROADMAP.md`](ROADMAP.md).
 
 Prueba rápida del pipeline completo:
 
 ```bash
 make up && make db-upgrade
 make dev-worker          # en otra terminal: procesa los viewsheds encolados
-make demo-project        # crea un proyecto, ingiere un DEM, genera candidatos y encola viewsheds
+make demo-project        # crea un proyecto, ingiere un DEM, genera candidatos,
+                          # encola viewsheds y, cuando terminan, ejecuta el optimizador
 ```
+
+O, sin terminal: abrir <http://localhost:3000/projects/new>, dibujar un área de
+estudio, y seguir el flujo — cargar DEM, generar candidatos, calcular
+viewsheds, optimizar y exportar — desde la página del proyecto.
 
 Después, abrir <http://localhost:3000/projects>.
 

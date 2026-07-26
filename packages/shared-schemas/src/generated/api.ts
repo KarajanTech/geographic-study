@@ -63,6 +63,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analysis-runs/{run_id}/optimization-solutions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the optimization solutions of a run */
+        get: operations["list_optimization_solutions_api_v1_analysis_runs__run_id__optimization_solutions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analysis-runs/{run_id}/viewsheds": {
         parameters: {
             query?: never;
@@ -74,6 +91,30 @@ export interface paths {
         get: operations["list_viewsheds_api_v1_analysis_runs__run_id__viewsheds_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analysis-runs/{viewshed_run_id}/optimize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Select the Sentinel positions that maximize covered surface
+         * @description Greedily choose candidates from a completed (or partial) viewshed run.
+         *
+         *     Runs synchronously: this operates on masks Phase 3 already computed —
+         *     array operations, not ray casting — so it finishes in seconds even for
+         *     hundreds of candidates.
+         */
+        post: operations["optimize_coverage_api_v1_analysis_runs__viewshed_run_id__optimize_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -197,6 +238,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/optimization-solutions/{solution_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a single optimization solution */
+        get: operations["get_optimization_solution_api_v1_optimization_solutions__solution_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/optimization-solutions/{solution_id}/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export the selected Sentinel positions as CSV */
+        get: operations["export_solution_csv_api_v1_optimization_solutions__solution_id__export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/optimization-solutions/{solution_id}/export.geojson": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export the selected Sentinel positions as GeoJSON */
+        get: operations["export_solution_geojson_api_v1_optimization_solutions__solution_id__export_geojson_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects": {
         parameters: {
             query?: never;
@@ -305,6 +397,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/priorities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a priorities/risk raster, aligned to the analysis DEM
+         * @description Ingest a risk-weight raster, resampled onto the analysis DEM's exact grid.
+         *
+         *     Requires a processed DEM to already exist for the project — there is
+         *     nothing to align to otherwise. The raw upload is stored untouched, like
+         *     every other raw dataset.
+         */
+        post: operations["upload_priorities_api_v1_projects__project_id__priorities_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/viewsheds/{viewshed_id}": {
         parameters: {
             query?: never;
@@ -365,7 +481,7 @@ export interface components {
          * @description What an analysis run produced. One kind per roadmap phase.
          * @enum {string}
          */
-        AnalysisRunKind: "candidates" | "viewshed";
+        AnalysisRunKind: "candidates" | "viewshed" | "optimization";
         /** AnalysisRunListResponse */
         AnalysisRunListResponse: {
             /** Items */
@@ -436,6 +552,14 @@ export interface components {
              * @description Resample to this cell size in metres.
              */
             target_resolution_m?: number | null;
+        };
+        /** Body_upload_priorities_api_v1_projects__project_id__priorities_post */
+        Body_upload_priorities_api_v1_projects__project_id__priorities_post: {
+            /**
+             * File
+             * @description GeoTIFF risk/priority raster.
+             */
+            file: string;
         };
         /**
          * BoundsMetric
@@ -775,6 +899,160 @@ export interface components {
             lat: number;
             /** Lon */
             lon: number;
+        };
+        /**
+         * OptimizationIteration
+         * @description One step of the greedy selection: which candidate, and what it gained.
+         */
+        OptimizationIteration: {
+            /**
+             * Candidate Id
+             * Format: uuid
+             */
+            candidate_id: string;
+            /**
+             * Cumulative Coverage
+             * @description Unweighted fraction of cells covered so far.
+             */
+            cumulative_coverage: number;
+            /**
+             * Cumulative Weighted Coverage
+             * @description Weighted fraction covered so far.
+             */
+            cumulative_weighted_coverage: number;
+            /**
+             * Marginal Gain
+             * @description Additional weighted surface this pick covers.
+             */
+            marginal_gain: number;
+            /**
+             * Step
+             * @description 0 is the first Sentinel selected.
+             */
+            step: number;
+            /** Viewshed Id */
+            viewshed_id: string | null;
+        };
+        /**
+         * OptimizationRunRequest
+         * @description Parameters for one greedy optimization run.
+         */
+        OptimizationRunRequest: {
+            /**
+             * Max Sites
+             * @description Stop once this many Sentinel are selected.
+             */
+            max_sites?: number | null;
+            /**
+             * Preset
+             * @description Built-in terrain-derived weight preset. Exclusive with `priorities_dataset_id`.
+             */
+            preset?: ("uniform" | "ridge_priority" | "valley_priority") | null;
+            /**
+             * Priorities Dataset Id
+             * @description Use this project's priorities raster as the base cell weight, aligned to the analysis surface. Mutually exclusive with `preset`.
+             */
+            priorities_dataset_id?: string | null;
+            /**
+             * Priority Zones
+             * @description Zone weight multiplies the base weight, on top of any preset or raster.
+             */
+            priority_zones?: components["schemas"]["PriorityZoneRequest"][];
+            /**
+             * Target Coverage
+             * @description Stop once weighted coverage reaches this fraction.
+             */
+            target_coverage?: number | null;
+        };
+        /** OptimizationSolutionListResponse */
+        OptimizationSolutionListResponse: {
+            /** Items */
+            items: components["schemas"]["OptimizationSolutionResponse"][];
+            /** Total */
+            total: number;
+        };
+        /** OptimizationSolutionResponse */
+        OptimizationSolutionResponse: {
+            /** Algorithm Version */
+            algorithm_version: string;
+            /**
+             * Analysis Run Id
+             * Format: uuid
+             */
+            analysis_run_id: string;
+            /** Coverage Ratio */
+            coverage_ratio: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Hidden Area Km2 */
+            hidden_area_km2: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Iterations */
+            iterations: components["schemas"]["OptimizationIteration"][];
+            /** Objective Value */
+            objective_value: number;
+            /** Redundancy Metrics */
+            redundancy_metrics: {
+                [key: string]: unknown;
+            } | null;
+            /** Runtime Seconds */
+            runtime_seconds: number;
+            /**
+             * Selected Candidate Ids
+             * @description In selection order: index 0 was picked first.
+             */
+            selected_candidate_ids: string[];
+            /** Solver */
+            solver: string;
+            /** Stop Reason */
+            stop_reason: string;
+            /** Total Cost */
+            total_cost: number | null;
+            /** Visible Area Km2 */
+            visible_area_km2: number;
+            /** Weighted Coverage Ratio */
+            weighted_coverage_ratio: number;
+            /**
+             * Weights Summary
+             * @description What produced the cell weights: uniform, a preset, a raster, or priority zone.
+             */
+            weights_summary: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
+         * PrioritiesIngestionResponse
+         * @description The raw upload and the priorities raster aligned to the analysis DEM.
+         */
+        PrioritiesIngestionResponse: {
+            /** @description Where to place the preview on a map. */
+            preview_bounds_wgs84: components["schemas"]["BoundsWGS84"];
+            /**
+             * Preview Url
+             * @description Relative URL of the greyscale PNG preview.
+             */
+            preview_url: string;
+            processed: components["schemas"]["DatasetResponse"];
+            raw: components["schemas"]["DatasetResponse"];
+        };
+        /**
+         * PriorityZoneRequest
+         * @description A zone in EPSG:4326 whose cells get an extra weight multiplier.
+         */
+        PriorityZoneRequest: {
+            geometry: components["schemas"]["GeoJSONGeometry"];
+            /**
+             * Weight
+             * @description Multiplier applied to this zone's cells, on top of the base weight.
+             */
+            weight: number;
         };
         /**
          * ProjectCreateRequest
@@ -1127,6 +1405,37 @@ export interface operations {
             };
         };
     };
+    list_optimization_solutions_api_v1_analysis_runs__run_id__optimization_solutions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OptimizationSolutionListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_viewsheds_api_v1_analysis_runs__run_id__viewsheds_get: {
         parameters: {
             query?: never;
@@ -1145,6 +1454,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ViewshedListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    optimize_coverage_api_v1_analysis_runs__viewshed_run_id__optimize_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                viewshed_run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OptimizationRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OptimizationSolutionResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1328,6 +1672,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReadinessResponse"];
+                };
+            };
+        };
+    };
+    get_optimization_solution_api_v1_optimization_solutions__solution_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                solution_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OptimizationSolutionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_solution_csv_api_v1_optimization_solutions__solution_id__export_csv_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                solution_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "text/csv": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_solution_geojson_api_v1_optimization_solutions__solution_id__export_geojson_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                solution_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/geo+json": unknown;
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1586,6 +2025,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DemIngestionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_priorities_api_v1_projects__project_id__priorities_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_priorities_api_v1_projects__project_id__priorities_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrioritiesIngestionResponse"];
                 };
             };
             /** @description Validation Error */

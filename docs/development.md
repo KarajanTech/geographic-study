@@ -49,21 +49,21 @@ make dev-worker  # processes queued viewsheds; without it they stay pending
 
 ## Everyday commands
 
-| Command               | What it does                                                                       |
-| --------------------- | ---------------------------------------------------------------------------------- |
-| `make help`           | List every target.                                                                 |
-| `make fmt`            | Format Python (Ruff) and TypeScript (Prettier).                                    |
-| `make lint`           | Ruff and ESLint.                                                                   |
-| `make typecheck`      | mypy (strict) and `tsc --noEmit`.                                                  |
-| `make test`           | pytest.                                                                            |
-| `make test-cov`       | pytest with coverage.                                                              |
-| `make check`          | Everything CI runs, locally.                                                       |
-| `make schemas`        | Re-export OpenAPI and regenerate the shared TypeScript types.                      |
-| `make sample-dem`     | Write a synthetic DEM to `data/raw`.                                               |
-| `make demo-project`   | Create a project, ingest a synthetic DEM, generate candidates and queue viewsheds. |
-| `make dev-worker`     | Run the viewshed worker on the host.                                               |
-| `make db-upgrade`     | Apply Alembic migrations.                                                          |
-| `make db-test-create` | Create the PostGIS database the test suite uses.                                   |
+| Command               | What it does                                                                                          |
+| --------------------- | ----------------------------------------------------------------------------------------------------- |
+| `make help`           | List every target.                                                                                    |
+| `make fmt`            | Format Python (Ruff) and TypeScript (Prettier).                                                       |
+| `make lint`           | Ruff and ESLint.                                                                                      |
+| `make typecheck`      | mypy (strict) and `tsc --noEmit`.                                                                     |
+| `make test`           | pytest.                                                                                               |
+| `make test-cov`       | pytest with coverage.                                                                                 |
+| `make check`          | Everything CI runs, locally.                                                                          |
+| `make schemas`        | Re-export OpenAPI and regenerate the shared TypeScript types.                                         |
+| `make sample-dem`     | Write a synthetic DEM to `data/raw`.                                                                  |
+| `make demo-project`   | Create a project, ingest a synthetic DEM, generate candidates, queue viewsheds and run the optimizer. |
+| `make dev-worker`     | Run the viewshed worker on the host.                                                                  |
+| `make db-upgrade`     | Apply Alembic migrations.                                                                             |
+| `make db-test-create` | Create the PostGIS database the test suite uses.                                                      |
 
 Install the git hooks once:
 
@@ -86,19 +86,37 @@ make test             # all tests, database ones included
 The schema for those tests comes from `Base.metadata`; CI runs
 `alembic upgrade head` separately so the migrations themselves are also proven.
 
-## Ingesting a DEM, generating candidates and computing viewsheds
+## Doing the whole flow from the browser (Phase 5)
 
-Try the whole Phase 1 + 2 + 3 pipeline without a frontend form:
+No terminal required: open `/projects/new`, name the project and draw the
+study area boundary on the map (Leaflet + OpenStreetMap tiles, `leaflet-draw`
+for the polygon tool), then on the created project's page — in order — upload
+a GeoTIFF DEM, generate candidates, queue viewsheds, and run the optimizer.
+Each step is a plain form over the same endpoints described below; while
+viewsheds are computing, the page polls and updates its own progress bar,
+then refreshes itself once the run finishes — no manual reload. Once a
+solution exists, export it as GeoJSON or CSV from the Optimization panel.
+
+## Ingesting a DEM, generating candidates, computing viewsheds and optimizing
+
+The same pipeline without a browser, via a script or curl directly:
 
 ```bash
 make up && make dev-worker   # in one terminal: stack up, worker running
-make demo-project            # in another: project + DEM + candidates + queued viewsheds
+make demo-project            # in another: project + DEM + candidates + viewsheds + optimization
 ```
 
-It prints the project id, preview URL and candidate/viewshed counts. Open
-`/projects` in the web app to see the study area, its hillshaded surface, the
-candidate sites, and — once the worker has processed the queue — each
-computed viewshed as a translucent overlay.
+`scripts/seed_demo_project.py` polls the viewshed run until the worker
+finishes it (or a timeout elapses) and then runs the greedy optimizer, so the
+printed summary includes `optimization_solution_id`, `selected_count` and
+`coverage_ratio` when the worker kept up. Pass `--skip-optimization` to stop
+right after queuing viewsheds instead.
+
+It prints the project id, preview URL and candidate/viewshed/optimization
+counts. Open `/projects` in the web app to see the study area, its hillshaded
+surface, the candidate sites, each computed viewshed as a translucent
+overlay, and — once a solution exists — the selected Sentinels highlighted on
+the map alongside the units-vs-coverage table.
 
 With a real DEM, and custom parameters:
 
@@ -125,6 +143,12 @@ curl -X POST localhost:8000/api/v1/projects/<id>/candidates \
 curl -X POST localhost:8000/api/v1/analysis-runs/<candidates-run-id>/viewsheds \
   -H 'content-type: application/json' \
   -d '{"observer_height_m": 10, "target_height_m": 0, "max_distance_m": 10000}'
+
+# <viewshed-run-id> comes from the response above, once its viewsheds are
+# completed (poll GET /analysis-runs/{id} until status=completed).
+curl -X POST localhost:8000/api/v1/analysis-runs/<viewshed-run-id>/optimize \
+  -H 'content-type: application/json' \
+  -d '{"max_sites": 5, "target_coverage": null}'
 ```
 
 DEM ingestion returns the raw dataset, the processed analysis surface, the
@@ -140,6 +164,54 @@ nothing is computed inside that request. A worker
 pending work and processes it; poll `GET /analysis-runs/{id}` for progress and
 `GET /analysis-runs/{id}/viewsheds` for the results once it reaches
 `completed`.
+
+Optimization runs synchronously — `POST /analysis-runs/{viewshed_run_id}/optimize`
+returns the finished `OptimizationSolution` in the same request, since the
+greedy algorithm only does array arithmetic over already-computed viewsheds,
+not ray casting. It rejects a run that is not `kind=viewshed` or that has no
+completed viewsheds yet. Fetch it again later with
+`GET /analysis-runs/{id}/optimization-solutions` or
+`GET /optimization-solutions/{id}`.
+
+Export a solution's selected Sentinels with
+`GET /optimization-solutions/{id}/export.geojson` (a FeatureCollection) or
+`GET /optimization-solutions/{id}/export.csv` — both serialize the persisted
+solution directly, so they always match what the map and table show.
+
+### Risk-weighted coverage (Phase 6)
+
+By default every cell counts equally. To weight coverage by risk or
+priority, `POST /analysis-runs/{viewshed_run_id}/optimize` accepts:
+
+```bash
+# Option 1: a preset, computed from the DEM's own elevation — illustrative,
+# not a real risk model (see ADR 0009).
+curl -X POST localhost:8000/api/v1/analysis-runs/<viewshed-run-id>/optimize \
+  -H 'content-type: application/json' \
+  -d '{"preset": "ridge_priority"}'
+
+# Option 2: an uploaded risk raster, resampled onto the analysis DEM's exact
+# grid so its cells line up with every viewshed.
+curl -X POST localhost:8000/api/v1/projects/<project-id>/priorities \
+  -F file=@risk.tif
+curl -X POST localhost:8000/api/v1/analysis-runs/<viewshed-run-id>/optimize \
+  -H 'content-type: application/json' \
+  -d '{"priorities_dataset_id": "<processed-priorities-dataset-id>"}'
+
+# Either can be combined with priority zones, whose weight multiplies
+# whichever base weight was chosen:
+curl -X POST localhost:8000/api/v1/analysis-runs/<viewshed-run-id>/optimize \
+  -H 'content-type: application/json' \
+  -d '{"preset": "valley_priority", "priority_zones": [{"geometry": {"type": "Polygon", "coordinates": [[[-3.75,40.39],[-3.74,40.39],[-3.74,40.40],[-3.75,40.40],[-3.75,40.39]]]}, "weight": 5.0}]}'
+```
+
+`priorities_dataset_id` and `preset` are mutually exclusive. Whatever was
+used is recorded on the solution as `weights_summary` — `{"source": "preset",
+"preset": "ridge_priority", ...}` or `{"source": "raster",
+"priorities_dataset_id": ...}`, plus any zone multipliers — so a solution's
+weighting is always reconstructible after the fact. `coverage_ratio`
+(physical) and `weighted_coverage_ratio` are always both present, whichever
+weighting was used.
 
 ## Configuration
 
@@ -158,9 +230,10 @@ apps/api                 FastAPI service
   app/api                HTTP routes (thin; no geospatial logic)
   app/core               config, logging, errors, paths, checksums
   app/db                 SQLAlchemy engine, session, base, entities
-  app/geo                CRS selection, raster metadata, validation, warp, terrain, candidates, viewshed
+  app/geo                CRS selection, raster metadata, validation, warp (incl. grid alignment), terrain, candidates, viewshed
+  app/optimization       solve_greedy, the candidate-cell matrix and cell-weight construction (no DB, no HTTP)
   app/schemas            Pydantic request/response models
-  app/services           storage, projects, datasets, ingestion, candidates, viewsheds
+  app/services           storage, projects, datasets, ingestion, candidates, viewsheds, optimization, priorities
   app/workers            standalone worker processes (viewshed_worker)
   migrations             Alembic
   tests                  pytest

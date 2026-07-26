@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Query, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 from app.api.deps import SessionDep, SettingsDep
-from app.api.serializers import serialize_analysis_run, serialize_candidate, serialize_viewshed
+from app.api.serializers import (
+    serialize_analysis_run,
+    serialize_candidate,
+    serialize_optimization_solution,
+    serialize_viewshed,
+)
 from app.core.errors import ResourceNotFoundError
 from app.db.models import AnalysisRunKind
 from app.geo.candidates import CandidateParameters
@@ -19,8 +26,14 @@ from app.schemas.candidate import (
     CandidateGenerationRequest,
     CandidateListResponse,
 )
+from app.schemas.optimization import (
+    OptimizationRunRequest,
+    OptimizationSolutionListResponse,
+    OptimizationSolutionResponse,
+)
 from app.schemas.viewshed import ViewshedListResponse, ViewshedResponse, ViewshedRunRequest
 from app.services import candidates as candidate_service
+from app.services import optimization as optimization_service
 from app.services import projects as project_service
 from app.services import viewsheds as viewshed_service
 from app.services.storage import from_relative_uri
@@ -194,3 +207,105 @@ def download_viewshed_preview(
         raise ResourceNotFoundError(msg, details={"viewshed_id": str(viewshed_id)})
     path = from_relative_uri(viewshed.preview_uri, settings)
     return FileResponse(path, media_type="image/png", filename=f"{viewshed_id}_preview.png")
+
+
+@router.post(
+    "/analysis-runs/{viewshed_run_id}/optimize",
+    response_model=OptimizationSolutionResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Select the Sentinel positions that maximize covered surface",
+)
+def optimize_coverage(
+    viewshed_run_id: uuid.UUID,
+    payload: OptimizationRunRequest,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> OptimizationSolutionResponse:
+    """Greedily choose candidates from a completed (or partial) viewshed run.
+
+    Runs synchronously: this operates on masks Phase 3 already computed —
+    array operations, not ray casting — so it finishes in seconds even for
+    hundreds of candidates.
+    """
+    _run, solution = optimization_service.run_greedy_optimization(
+        session,
+        viewshed_run_id,
+        settings=settings,
+        max_sites=payload.max_sites,
+        target_coverage=payload.target_coverage,
+        priorities_dataset_id=payload.priorities_dataset_id,
+        preset=payload.preset,
+        priority_zones=[
+            {"geometry": zone.geometry.to_dict(), "weight": zone.weight}
+            for zone in payload.priority_zones
+        ],
+    )
+    return serialize_optimization_solution(solution)
+
+
+@router.get(
+    "/analysis-runs/{run_id}/optimization-solutions",
+    response_model=OptimizationSolutionListResponse,
+    summary="List the optimization solutions of a run",
+)
+def list_optimization_solutions(
+    run_id: uuid.UUID, session: SessionDep
+) -> OptimizationSolutionListResponse:
+    items = optimization_service.list_optimization_solutions(session, run_id)
+    return OptimizationSolutionListResponse(
+        items=[serialize_optimization_solution(s) for s in items], total=len(items)
+    )
+
+
+@router.get(
+    "/optimization-solutions/{solution_id}",
+    response_model=OptimizationSolutionResponse,
+    summary="Get a single optimization solution",
+)
+def get_optimization_solution(
+    solution_id: uuid.UUID, session: SessionDep
+) -> OptimizationSolutionResponse:
+    solution = optimization_service.get_optimization_solution(session, solution_id)
+    return serialize_optimization_solution(solution)
+
+
+@router.get(
+    "/optimization-solutions/{solution_id}/export.geojson",
+    summary="Export the selected Sentinel positions as GeoJSON",
+    responses={200: {"content": {"application/geo+json": {}}}},
+)
+def export_solution_geojson(solution_id: uuid.UUID, session: SessionDep) -> JSONResponse:
+    feature_collection = optimization_service.build_solution_geojson(session, solution_id)
+    return JSONResponse(
+        content=feature_collection,
+        media_type="application/geo+json",
+        headers={"Content-Disposition": f'attachment; filename="{solution_id}.geojson"'},
+    )
+
+
+@router.get(
+    "/optimization-solutions/{solution_id}/export.csv",
+    summary="Export the selected Sentinel positions as CSV",
+    responses={200: {"content": {"text/csv": {}}}},
+)
+def export_solution_csv(solution_id: uuid.UUID, session: SessionDep) -> Response:
+    rows = optimization_service.build_solution_csv_rows(session, solution_id)
+    buffer = io.StringIO()
+    fieldnames = [
+        "rank",
+        "candidate_site_id",
+        "longitude",
+        "latitude",
+        "elevation_m",
+        "marginal_gain_cells",
+        "cumulative_coverage",
+        "cumulative_weighted_coverage",
+    ]
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(rows)
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{solution_id}.csv"'},
+    )

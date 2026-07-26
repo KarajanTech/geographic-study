@@ -1,12 +1,15 @@
 #!/usr/bin/env python
-"""Create a demonstration project, ingest a DEM, generate candidates, and
-queue viewshed computation for them.
+"""Create a demonstration project, ingest a DEM, generate candidates, queue
+viewshed computation for them, and (once the worker finishes) run the greedy
+coverage optimizer.
 
-This exists so the Phase 1, 2 and 3 pipelines can be run end to end without a
+This exists so the Phase 1-4 pipelines can be run end to end without a
 frontend form (that arrives in Phase 5). It talks to the API over HTTP,
 exactly as a client would. Viewsheds are only *queued*: a worker
 (`make dev-worker`, or the `worker` Compose service) must be running to
-actually compute them.
+actually compute them. This script polls the viewshed run until it finishes
+(or a timeout elapses) before requesting an optimization solution, since
+`solve_greedy` needs completed viewsheds to build its candidate-cell matrix.
 
 By default it generates synthetic terrain and a study area over it, both
 clearly marked as synthetic. Pass ``--dem`` to ingest a real GeoTIFF instead.
@@ -24,6 +27,7 @@ import argparse
 import json
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -109,6 +113,35 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=5_000.0,
         help="Sentinel sight range, metres (default: 5000).",
     )
+    parser.add_argument(
+        "--skip-optimization",
+        action="store_true",
+        help="Stop after queuing viewsheds; do not wait for them or run the optimizer.",
+    )
+    parser.add_argument(
+        "--max-sites",
+        type=int,
+        default=None,
+        help="Maximum number of Sentinels the optimizer may select (default: unlimited).",
+    )
+    parser.add_argument(
+        "--target-coverage",
+        type=float,
+        default=None,
+        help="Stop the optimizer once this weighted coverage ratio is reached (default: none).",
+    )
+    parser.add_argument(
+        "--optimization-poll-timeout-s",
+        type=float,
+        default=120.0,
+        help="Give up waiting for viewsheds to finish after this many seconds (default: 120).",
+    )
+    parser.add_argument(
+        "--optimization-poll-interval-s",
+        type=float,
+        default=2.0,
+        help="Seconds between viewshed-run status polls (default: 2).",
+    )
     return parser.parse_args(argv)
 
 
@@ -126,6 +159,30 @@ def study_area_from_raster(path: Path, inset: float) -> dict[str, Any]:
     inset_y = (top - bottom) * inset
     inner = box(left + inset_x, bottom + inset_y, right - inset_x, top - inset_y)
     return dict(mapping(reproject_geometry(inner, crs_text, "EPSG:4326")))
+
+
+def wait_for_viewshed_run(
+    client: httpx2.Client, run_id: str, *, timeout_s: float, interval_s: float
+) -> tuple[dict[str, Any], str | None]:
+    """Poll a viewshed run until it stops being ``pending``/``running``.
+
+    Returns the last-seen run payload and, if optimization should be skipped
+    (timeout, or no viewshed finished successfully), a human-readable reason.
+    """
+    deadline = time.monotonic() + timeout_s
+    run: dict[str, Any] = client.get(f"{API_PREFIX}/analysis-runs/{run_id}").json()
+    while run["status"] in ("pending", "running") and time.monotonic() < deadline:
+        time.sleep(interval_s)
+        run = client.get(f"{API_PREFIX}/analysis-runs/{run_id}").json()
+
+    if run["status"] in ("pending", "running"):
+        return run, (
+            f"Timed out after {timeout_s:.0f}s waiting for viewsheds to finish; "
+            "is a worker running (make dev-worker)? Skipping optimization."
+        )
+    if int(run["metrics"].get("completed", 0)) == 0:
+        return run, "No viewsheds completed successfully; skipping optimization."
+    return run, None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -211,6 +268,31 @@ def main(argv: list[str] | None = None) -> int:
                     return 1
                 viewshed_run = queued.json()
 
+            optimization: dict[str, Any] | None = None
+            optimization_note: str | None = None
+            if viewshed_run is not None and not args.skip_optimization:
+                viewshed_run, optimization_note = wait_for_viewshed_run(
+                    client,
+                    viewshed_run["id"],
+                    timeout_s=args.optimization_poll_timeout_s,
+                    interval_s=args.optimization_poll_interval_s,
+                )
+                if optimization_note is None:
+                    optimized = client.post(
+                        f"{API_PREFIX}/analysis-runs/{viewshed_run['id']}/optimize",
+                        json={
+                            "max_sites": args.max_sites,
+                            "target_coverage": args.target_coverage,
+                        },
+                    )
+                    if optimized.status_code != 201:
+                        print(
+                            f"Optimization failed: {optimized.status_code} {optimized.text}",
+                            file=sys.stderr,
+                        )
+                        return 1
+                    optimization = optimized.json()
+
     summary: dict[str, Any] = {
         "project_id": project["id"],
         "analysis_crs": project["analysis_crs"],
@@ -232,11 +314,22 @@ def main(argv: list[str] | None = None) -> int:
         summary["viewshed_run_status"] = viewshed_run["status"]
         summary["viewsheds_queued"] = viewshed_run["metrics"]["total"]
         summary["viewsheds_cache_hits"] = viewshed_run["metrics"]["cache_hits"]
-        summary["note"] = (
-            "Viewsheds are queued, not computed. Ensure a worker is running "
-            "(make dev-worker, or the 'worker' Compose service) and poll "
-            f"GET /api/v1/analysis-runs/{viewshed_run['id']} for status=completed."
+        if args.skip_optimization:
+            summary["note"] = (
+                "Viewsheds are queued, not computed. Ensure a worker is running "
+                "(make dev-worker, or the 'worker' Compose service) and poll "
+                f"GET /api/v1/analysis-runs/{viewshed_run['id']} for status=completed."
+            )
+    if optimization is not None:
+        summary["optimization_solution_id"] = optimization["id"]
+        summary["optimization_stop_reason"] = optimization["stop_reason"]
+        summary["selected_count"] = len(optimization["selected_candidate_ids"])
+        summary["optimization_coverage_ratio"] = round(optimization["coverage_ratio"], 4)
+        summary["optimization_weighted_coverage_ratio"] = round(
+            optimization["weighted_coverage_ratio"], 4
         )
+    elif optimization_note is not None:
+        summary["note"] = optimization_note
 
     print(json.dumps(summary, indent=2))
     return 0

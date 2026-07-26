@@ -54,12 +54,20 @@ export default async function HomePage(): Promise<React.ReactElement> {
             Phase 2 — candidate generation: grid, slope and prominence filtering, minimum
             separation.
           </li>
+          <li>Phase 3 — viewshed engine: line-of-sight computation, caching, worker execution.</li>
           <li>
-            <strong>Phase 3 — viewshed engine:</strong> line-of-sight computation, caching, worker
-            execution. Current phase.
+            Phase 4 — greedy maximum coverage optimizer: candidate-cell matrix, deterministic
+            tie-breaking, units-vs-coverage curve.
           </li>
-          <li>Phase 4 — greedy maximum coverage optimizer.</li>
-          <li>Phase 5 — usable MVP interface.</li>
+          <li>
+            Phase 5 — usable MVP interface: draw a study area on a real map, upload a DEM, configure
+            and launch each step, watch progress, export the result.
+          </li>
+          <li>
+            <strong>Phase 6 — risk-weighted coverage:</strong> upload a priority raster or pick a
+            terrain preset, boost priority zones, physical vs. weighted coverage reported and saved
+            separately. Current phase.
+          </li>
         </ul>
       </section>
     </main>

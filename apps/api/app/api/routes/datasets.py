@@ -18,10 +18,12 @@ from app.schemas.dataset import (
     DatasetListResponse,
     DatasetResponse,
     DemIngestionResponse,
+    PrioritiesIngestionResponse,
     ValidationResponse,
 )
 from app.schemas.geojson import BoundsWGS84
 from app.services import datasets as dataset_service
+from app.services import priorities as priorities_service
 from app.services import projects as project_service
 from app.services.ingestion import DEFAULT_BUFFER_M, IngestionParameters
 
@@ -77,6 +79,55 @@ def upload_dem(
             coverage_ratio=validation.get("coverage_ratio"),
         ),
         preview_url=f"/api/v1/datasets/{processed.id}/hillshade_preview.png",
+        preview_bounds_wgs84=BoundsWGS84(
+            west=bounds["left"], south=bounds["bottom"], east=bounds["right"], north=bounds["top"]
+        ),
+    )
+
+
+@router.post(
+    "/projects/{project_id}/priorities",
+    response_model=PrioritiesIngestionResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload a priorities/risk raster, aligned to the analysis DEM",
+)
+def upload_priorities(
+    project_id: uuid.UUID,
+    session: SessionDep,
+    settings: SettingsDep,
+    file: Annotated[UploadFile, File(description="GeoTIFF risk/priority raster.")],
+) -> PrioritiesIngestionResponse:
+    """Ingest a risk-weight raster, resampled onto the analysis DEM's exact grid.
+
+    Requires a processed DEM to already exist for the project — there is
+    nothing to align to otherwise. The raw upload is stored untouched, like
+    every other raw dataset.
+    """
+    project = project_service.get_project(session, project_id)
+    if file.filename is None:
+        msg = "The uploaded file has no filename"
+        raise InvalidInputError(msg)
+
+    analysis_dataset = dataset_service.get_active_dem_dataset(session, project_id)
+    if analysis_dataset is None:
+        msg = "Upload a DEM for this project before uploading a priorities raster"
+        raise InvalidInputError(msg, details={"project_id": str(project_id)})
+
+    raw, processed = priorities_service.ingest_priorities_upload(
+        session,
+        project,
+        upload=file.file,
+        filename=file.filename,
+        content_type=file.content_type,
+        settings=settings,
+        analysis_dataset=analysis_dataset,
+    )
+
+    bounds = processed.metadata_json.get("preview_bounds_wgs84", {})
+    return PrioritiesIngestionResponse(
+        raw=serialize_dataset(raw),
+        processed=serialize_dataset(processed),
+        preview_url=f"/api/v1/datasets/{processed.id}/preview.png",
         preview_bounds_wgs84=BoundsWGS84(
             west=bounds["left"], south=bounds["bottom"], east=bounds["right"], north=bounds["top"]
         ),

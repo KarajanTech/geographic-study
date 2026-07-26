@@ -26,6 +26,9 @@ export default async function ProjectsPage(): Promise<React.ReactElement> {
       <p className="subtitle">
         A project is a study area plus the projected metric CRS every calculation for it uses.
       </p>
+      <p>
+        <Link href="/projects/new">+ New project</Link>
+      </p>
 
       {error !== null ? (
         <section className="panel">
@@ -41,7 +44,7 @@ export default async function ProjectsPage(): Promise<React.ReactElement> {
         <section className="panel">
           <h2>No projects yet</h2>
           <p className="subtitle">
-            Create one with <code>POST /api/v1/projects</code>, or run{" "}
+            <Link href="/projects/new">Create one</Link> by drawing a study area, or run{" "}
             <code>make demo-project</code> to seed a demonstration study area with a synthetic DEM.
           </p>
         </section>

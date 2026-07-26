@@ -79,3 +79,14 @@ class DemIngestionResponse(BaseModel):
     validation: ValidationResponse
     preview_url: str = Field(description="Relative URL of the hillshade PNG preview.")
     preview_bounds_wgs84: BoundsWGS84 = Field(description="Where to place the preview on a map.")
+
+
+class PrioritiesIngestionResponse(BaseModel):
+    """The raw upload and the priorities raster aligned to the analysis DEM."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    raw: DatasetResponse
+    processed: DatasetResponse
+    preview_url: str = Field(description="Relative URL of the greyscale PNG preview.")
+    preview_bounds_wgs84: BoundsWGS84 = Field(description="Where to place the preview on a map.")

@@ -153,6 +153,74 @@ def reproject_raster(
     return _describe_output(destination_path)
 
 
+def resample_to_reference(
+    source_path: Path,
+    destination_path: Path,
+    reference_path: Path,
+    *,
+    resampling: Resampling = Resampling.bilinear,
+) -> WarpResult:
+    """Reproject a raster onto another raster's exact grid.
+
+    Unlike :func:`reproject_raster` (which derives its own transform) and
+    :func:`clip_raster` (which clips to a geometry), this snaps the source
+    directly to the reference's CRS, transform, width and height. Two rasters
+    processed independently — even with the same nominal CRS and resolution —
+    can disagree by fractions of a pixel; only sharing one's exact grid
+    guarantees their cells correspond 1:1 by array index, which is what a
+    per-cell weight surface needs to line up with the analysis DEM's cells.
+
+    Raises:
+        InvalidInputError: if the source has no CRS.
+    """
+    destination_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with rasterio.open(reference_path) as reference:
+        dst_crs = reference.crs
+        dst_transform = reference.transform
+        dst_width = reference.width
+        dst_height = reference.height
+
+    with rasterio.open(source_path) as source:
+        if source.crs is None:
+            msg = "Cannot align a raster without a CRS"
+            raise InvalidInputError(msg, details={"path": source_path.name})
+        source_nodata = source.nodata if source.nodata is not None else DEFAULT_NODATA
+
+        profile = {
+            **GTIFF_PROFILE,
+            "width": dst_width,
+            "height": dst_height,
+            "count": 1,
+            "dtype": ELEVATION_DTYPE,
+            "crs": dst_crs,
+            "transform": dst_transform,
+            "nodata": DEFAULT_NODATA,
+        }
+
+        with rasterio.open(destination_path, "w", **profile) as destination:
+            reproject(
+                source=rasterio.band(source, 1),
+                destination=rasterio.band(destination, 1),
+                src_transform=source.transform,
+                src_crs=source.crs,
+                src_nodata=source_nodata,
+                dst_transform=dst_transform,
+                dst_crs=dst_crs,
+                dst_nodata=DEFAULT_NODATA,
+                resampling=resampling,
+            )
+            destination.update_tags(
+                units="m",
+                processing="aligned_to_reference",
+                source_crs=source.crs.to_string(),
+                target_crs=dst_crs.to_string(),
+                resampling=resampling.name,
+            )
+
+    return _describe_output(destination_path)
+
+
 def clip_raster(
     source_path: Path,
     destination_path: Path,
