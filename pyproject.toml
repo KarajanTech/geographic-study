@@ -9,10 +9,11 @@ dependencies = [
     "rasterio",
     "shapely",
     "pyproj",
+    "affine",
     "matplotlib",
     "pillow",
     "requests",
-    "tqdm",
+    "flask",
 ]
 
 [project.scripts]
