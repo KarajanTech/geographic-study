@@ -1,8 +1,0 @@
-node_modules
-.next
-data
-apps/api/.venv
-packages/shared-schemas/src/generated
-packages/shared-schemas/openapi.json
-package-lock.json
-uv.lock

@@ -1,0 +1,29 @@
+[project]
+name = "sentinel-coverage"
+version = "0.1.0"
+description = "Automatic viewshed-optimal placement of Karajan Sentinel wildfire-watch masts over real terrain"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "scipy",
+    "rasterio",
+    "shapely",
+    "pyproj",
+    "matplotlib",
+    "pillow",
+    "requests",
+    "tqdm",
+]
+
+[project.scripts]
+sentinel-study = "sentinel_coverage.run_study:cli"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["sentinel_coverage*"]
+
+[tool.pytest.ini_options]
+testpaths = ["sentinel_coverage/tests"]
